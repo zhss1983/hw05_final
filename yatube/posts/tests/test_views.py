@@ -280,13 +280,9 @@ class CashViewsTest(TestCase, MySetupTestCase):
     def test_index_page_cash(self):
         """Check caching of the index.html (url '/')."""
         cls = self.__class__
-        context = {
-            'group': cls.group.pk,
-            'text': f'Edit post chash. {id(cls.post)}',
-        }
         post_start = Post.objects.get(id=cls.post.pk)
         self.client.get(cls.url_index)
-        cls.post.text=f'Edit post chash. {id(cls.post)}'
+        cls.post.text = f'Edit post chash. {id(cls.post)}'
         cls.post.save()
         post_edit = Post.objects.get(id=cls.post.pk)
         self.assertNotEqual(post_start.text, post_edit.text)

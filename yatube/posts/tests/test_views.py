@@ -285,24 +285,16 @@ class CashViewsTest(TestCase, MySetupTestCase):
             'text': f'Edit post chash. {id(cls.post)}',
         }
         post_start = Post.objects.get(id=cls.post.pk)
-        # Страница точно прокэширована
         self.client.get(cls.url_index)
-        # Меняю содержимое базы данных
         cls.authorized_client.post(cls.url_post_edit, data=context)
-        # Читаю из базы изменения в посте.
         post_edit = Post.objects.get(id=cls.post.pk)
         self.assertNotEqual(post_start.text, post_edit.text)
-        # Читаю закэшированную страницу
         response = self.client.get(cls.url_index)
-        # Убеждаюсь что прочитал кэш
         content = response.content.decode(errors='xmlcharrefreplace')
         self.assertIn(post_start.text, content)
         self.assertNotIn(post_edit.text, content)
-        # Жду гарантированное время для того что бы кэш устарел
         sleep(CACHE_TTL + 1)
-        # Читаю обновлённую страницу
         response = self.client.get(cls.url_index)
-        # Убеждаюсь что прочитал не кэш
         content = response.content.decode(errors='xmlcharrefreplace')
         self.assertNotIn(post_start.text, content)
         self.assertIn(post_edit.text, content)

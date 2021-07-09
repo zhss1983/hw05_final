@@ -286,7 +286,8 @@ class CashViewsTest(TestCase, MySetupTestCase):
         }
         post_start = Post.objects.get(id=cls.post.pk)
         self.client.get(cls.url_index)
-        cls.authorized_client.post(cls.url_post_edit, data=context)
+        cls.post.text=f'Edit post chash. {id(cls.post)}'
+        cls.post.save()
         post_edit = Post.objects.get(id=cls.post.pk)
         self.assertNotEqual(post_start.text, post_edit.text)
         response = self.client.get(cls.url_index)

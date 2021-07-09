@@ -62,9 +62,10 @@ class Post(models.Model):
     )
     image = models.ImageField(
         upload_to='posts/',
+        verbose_name='Изображение',
         blank=True,
         null=True,
-        help_text='Загрузите картинку',
+        help_text='Загрузите изображение',
     )
 
     class Meta:

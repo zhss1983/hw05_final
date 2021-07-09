@@ -1,0 +1,83 @@
+{% load user_filters %}
+
+<div class="card-body">
+
+  {% if form.errors %}
+    {% for field in form %}
+      {% for error in field.errors %}
+        <div class="alert alert-danger" role="alert">
+          <em>{{ field.label }}: {{ error|escape }}</em>
+        </div>
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    {% if next != None %}
+      <input type="hidden" name="next" value="{{ next }}">
+    {% endif %}
+
+    {% for hidden in form.hidden_fields %}
+      {{ hidden }}
+    {% endfor %}
+
+    {% for field in form.visible_fields %}
+      <div class="form-group row">
+        <label
+          for="{{ field.id_for_label }}"
+          class="col-md-4 col-form-label text-md-right"
+          data-toggle="tooltip"
+          data-placement="top"
+          data-html="true"
+          title="{{ field.help_text|linebreaks|striptags }}">
+          {{ field.label_tag }}
+        </label>
+
+        <div class="col-md-6">
+          {{ field|addclass:"form-control" }}
+          {% if field.help_text %}
+            <small
+              id="{{ field.id_for_label }}-help"
+              class="form-text text-muted">
+              {{ field.help_text|safe }}
+            </small>
+          {% endif %}
+          {% if field.name == 'image' %}
+            <button type="button" id="custom-button" class="btn btn-sm btn-primary">Выберите файл</button>
+            <p class="file-input-name">Файл не выбран</p>
+          {% endif %}
+        </div>
+
+      </div>
+    {% endfor %}
+
+    <div class="col-md-6 offset-md-4">
+      <button type="submit" class="btn btn-sm btn-primary">
+        {{ btn_name }}
+      </button>
+      {% if link_url != None %}
+        <a href="{{ link_url }}" class="btn btn-sm btn-link">{{ link_text }}</a>
+      {% endif %}
+    </div>
+
+  </form>
+</div>
+
+<script type="text/javascript">
+    const realFileBtn = document.getElementById("id_image");
+    const customBtn = document.getElementById("custom-button");
+    const fileNames = document.getElementsByClassName("file-input-name")
+    realFileBtn.style = "display:none";
+    customBtn.addEventListener("click", function() {
+        realFileBtn.click();
+    });
+    function change_filename_text() {
+        if (realFileBtn.files.length) {
+            const fileName = realFileBtn.files[0].name
+            fileNames[0].textContent = fileName
+        }
+    }
+    realFileBtn.addEventListener("change", change_filename_text);
+</script>

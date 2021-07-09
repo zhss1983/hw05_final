@@ -1,3 +1,21 @@
+# Мои исключения
+static/
+media/
+sent_emails/
+*.log
+log.*
+.idea/
+/venv
+/test
+static
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -58,8 +76,8 @@ coverage.xml
 # Django stuff:
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
+#db.sqlite3
+#db.sqlite3-journal
 
 # Flask stuff:
 instance/
@@ -144,9 +162,3 @@ dmypy.json
 .history/
 
 .mypy_cache
-
-# папки со статикой и медиа
-static/
-yatube/posts/static/
-yatube/media/
-

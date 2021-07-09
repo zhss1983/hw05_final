@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}
+  {{ edit|yesno:"Редактировать,Добавить," }} запись
+{% endblock %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-8 p-5">
+      <div class="card">
+        <div class="card-header">
+          {{ edit|yesno:"Редактировать,Добавить" }} запись
+        </div>
+        {% include "includes/form.html" with btn_name=edit|yesno:"Сохранить,Добавить" %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

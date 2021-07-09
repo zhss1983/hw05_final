@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}О применённых технологиях{% endblock %}
+{% block content %}
+  <div class="row">
+    <div class="col-md-3 mb-3 mt-1">
+      <div class="card">
+        <div class="card-body">
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <div class="h3">
+                <h3>Технологии</h3>
+                <img
+                  src="{% static 'python_django.jpeg' %}"
+                  alt="Об авторе"
+                  width="150"
+                  height="150"
+                >
+              </div>
+            </li>
+            <li class="list-group-item">
+              <div class="h6 text-muted">
+                Технологии Django + язык Python.
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-9">
+      <div class="card-body">
+        <div class="card-text">
+          <h1>Применяемые при создании технологии.</h1>
+          <div class="text-justify">
+            <p>
+              При создании данного приложения были использованы:
+              <ul>
+                <li>Python 3.8</li>
+                <li>
+                  Django 2.2
+                  <ul>
+                    <li>Шаблоны, HTML, CSS</li>
+                    <li>SQL, CRUD, Система авторизации.</li>
+                  </ul>
+                </li>
+                <li>SQLite 3</li>
+              </ul>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,27 +1,64 @@
 from datetime import datetime as dt
 from os import path
-from time import sleep
+import shutil
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
+from django.core.paginator import Page
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from .test_setups import MySetupTestCase
-from posts.models import Comment, Group, Post, User
+from posts.forms import PostForm
+from posts.models import Comment, Follow, Group, Post, User
 from posts.views import my_paginator
-from yatube.settings import CACHE_TTL, DELTA_PAGE_COUNT, MAX_PAGE_COUNT
+from yatube.settings import DELTA_PAGE_COUNT, MAX_PAGE_COUNT
+
+User = get_user_model()
 
 
-class PostsURLTests(TestCase, MySetupTestCase):
+class PostsURLTestsCase(TestCase):
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        MySetupTestCase.setUpClass()
+        cls.user = User.objects.create(username='user_PostsURLTestsCase_1')
+        cls.group = Group.objects.create(
+            title='Тест_PostsURLTestsCase_1',
+            slug='test_PostsURLTestsCase_1',
+            description='Текст_PostsURLTestsCase',
+        )
+        cls.post = Post.objects.create(
+            text='Тест_PostsURLTestsCase',
+            author=cls.user,
+            group=cls.group,
+        )
+        cls.url_index = reverse('index')
+        cls.url_group = reverse('group', kwargs={'slug': cls.group.slug})
+        cls.url_profile = reverse(
+            'profile',
+            kwargs={'username': cls.user.username}
+        )
+        cls.url_post = reverse(
+            'post',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': cls.post.pk
+            }
+        )
+        cls.url_follow_index = reverse('follow_index')
+        cls.url_new_post = reverse('new_post')
+        cls.url_post_edit = reverse(
+            'post_edit',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': cls.post.pk
+            }
+        )
 
-    @classmethod
-    def tearDownClass(cls):
-        MySetupTestCase.tearDownClass()
-        super().tearDownClass()
+    def setUp(self):
+        cache.clear()
 
     def test_url_uses_correct_template_by_guest(self):
         """Check matching of template name and URL address."""
@@ -32,6 +69,7 @@ class PostsURLTests(TestCase, MySetupTestCase):
             (cls.url_post, 'posts/post.html'),
             (cls.url_group, 'posts/group.html'),
         )
+        cache.clear()
         for url, template_name in url_list:
             response = self.client.get(url)
             with self.subTest(url=url):
@@ -40,73 +78,158 @@ class PostsURLTests(TestCase, MySetupTestCase):
     def test_url_uses_correct_template_auth_user(self):
         """Check matching of template name and URL address."""
         cls = self.__class__
+        authorized_client = Client()
+        authorized_client.force_login(cls.user)
         auth_url_list = (
             (cls.url_new_post, 'posts/manage_post.html'),
             (cls.url_post_edit, 'posts/manage_post.html'),
             (cls.url_follow_index, 'posts/follow.html'),
         )
         for url, template_name in auth_url_list:
-            response = self.authorized_client.get(url)
+            response = authorized_client.get(url)
             with self.subTest(url=url):
                 self.assertTemplateUsed(response, template_name=template_name)
 
     def test_posts_contain_in_correct_group(self):
         """Check correct access by group."""
         cls = self.__class__
+        authorized_client = Client()
+        authorized_client.force_login(cls.user)
         new_group = Group.objects.create(
             title='Group №2',
             slug='test_group_2',
             description='Тестовая группа № 2',
         )
-        context = {
-            'group': cls.group.pk,
-            'text': f'Test post (group = {cls.group.pk}). {id(cls.group)}'
-        }
-        cls.authorized_client.post(cls.url_new_post, data=context)
-        my_post = Post.objects.filter(text=context['text']).last()
+        #print('Число постов после создания', Post.objects.count())
+        #my_post = Post.objects.last()
+        #print('Последний пост:', my_post.pk, my_post.text, my_post.group_id, my_post.pub_date)
+        my_post = Post.objects.first()
+        #print('Первый пост:', my_post.pk, my_post.text, my_post.group_id, my_post.pub_date)
+        #print('Ожидаемый пост:', cls.post.pk, cls.post.text, cls.post.group_id, cls.post.pub_date)
         in_list_url = (
-            cls.url_index,
             cls.url_group,
+            cls.url_index,
         )
         for url in in_list_url:
             with self.subTest(url=url):
                 cache.clear()
-                response = cls.authorized_client.get(url)
-                posts = response.context['page'].object_list
-                self.assertIn(my_post, posts)
+                response = authorized_client.get(url)
+                self.assertIn(my_post, response.context['page'].object_list)
         url_new_group = reverse('group', kwargs={'slug': new_group.slug})
-        response = cls.authorized_client.get(url_new_group)
-        posts = response.context['page'].object_list
-        self.assertNotIn(my_post, posts)
-
-    def test_wron_user_edit_post(self):
-        """Check redirect from edit_post page for an unauthorized user."""
-        cls = self.__class__
-        authorized_client = Client()
-        other_user = User.objects.create(
-            username='other_user',
-        )
-        authorized_client.force_login(other_user)
-        response = authorized_client.get(cls.url_post_edit)
-        self.assertRedirects(response, cls.url_post)
+        response = authorized_client.get(url_new_group)
+        self.assertNotIn(my_post, response.context['page'].object_list)
 
 
-class PostsContextTests(TestCase, MySetupTestCase):
+class PostsContextTestsCase(TestCase):
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        MySetupTestCase.setUpClass()
+        settings.MEDIA_ROOT = 'tempfile_media'
+        cls.url_list = (
+            ('about:author', 'about/author.html', '/about/author/'),
+            ('about:tech', 'about/tech.html', '/about/tech/'),
+        )
+        cls.user = User.objects.create(username='user_PostsContextTestsCase')
+        cls.group = Group.objects.create(
+            title='Тест_PostsContextTestsCase',
+            slug='test_PostsContextTestsCase',
+            description='Текст_PostsContextTestsCase',
+        )
+        img = cls.img_upload()
+        cls.post = Post.objects.create(
+            text='Тест_PostsContextTestsCase',
+            author=cls.user,
+            group=cls.group,
+            image=img
+        )
+        img.close()
+        cls.url_post_edit = reverse(
+            'post_edit',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': cls.post.pk
+            }
+        )
+        cls.url_new_post = reverse('new_post')
+        cls.url_follow_index = reverse('follow_index')
+        cls.url_group = reverse('group', kwargs={'slug': cls.group.slug})
+        cls.url_profile = reverse(
+            'profile',
+            kwargs={'username': cls.user.username}
+        )
+        cls.url_post = reverse(
+            'post',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': cls.post.pk
+            }
+        )
+        cls.url_index = reverse('index')
 
     @classmethod
     def tearDownClass(cls):
-        MySetupTestCase.tearDownClass()
-        super().tearDownClass()
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+
+    @classmethod
+    def img_upload(cls):
+        return SimpleUploadedFile(
+            name='small.gif',
+            content=(
+                b'\x47\x49\x46\x38\x39\x61\x02\x00'
+                b'\x01\x00\x80\x00\x00\x00\x00\x00'
+                b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+                b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+                b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+                b'\x0A\x00\x3B'
+            ),
+            content_type='image/gif'
+        )
+
+    def setUp(self):
+        cache.clear()
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.__class__.user)
+
+    def test_url_uses_correct_template(self):
+        """Check matching of template name and URL address."""
+        for url, template_name, abs_url in self.__class__.url_list:
+            with self.subTest(url=url):
+                response = self.authorized_client.get(reverse(url))
+                self.assertTemplateUsed(response, template_name=template_name)
+
+    def test_posts_contain_form(self):
+        """Check templates on form context containing."""
+        cls = self.__class__
+        url_list = (
+            cls.url_new_post,
+            cls.url_post_edit,
+        )
+        for url in url_list:
+            response = self.authorized_client.get(url)
+            with self.subTest(url=url):
+                self.assertIn('form', response.context)
+                self.assertIsInstance(response.context['form'], PostForm)
 
     def test_posts_shows_correct_context(self):
-        """Check specific context, not paginator context."""
+        """Check specific context, not paginator context.
+
+        Checking that the corresponding variables are passed into the context
+        and their value is as expected. In cases where a group, author or post
+        is passed, it is checked that this is the correct group, author or post
+        from database.
+        """
         cls = self.__class__
         year = dt.today().year
         url_list = (
+            (
+                cls.url_new_post,
+                ('year', year),
+            ),
+            (
+                cls.url_post_edit,
+                ('year', year),
+            ),
             (
                 cls.url_profile,
                 ('author', cls.user),
@@ -123,24 +246,15 @@ class PostsContextTests(TestCase, MySetupTestCase):
                 ('year', year),
             ),
             (
-                cls.url_new_post,
-                ('edit', False),
-                ('year', year),
-            ),
-            (
-                cls.url_post_edit,
-                ('edit', True),
-                ('year', year),
-            ),
-            (
                 cls.url_follow_index,
                 ('year', year),
             ),
         )
         for url, *context in url_list:
-            response = cls.authorized_client.get(url)
+            response = self.authorized_client.get(url)
             for name, value in context:
                 with self.subTest(url=url, name=name):
+                    self.assertIn(name, response.context)
                     self.assertEqual(value, response.context[name])
 
     def test_posts_shows_images(self):
@@ -153,7 +267,7 @@ class PostsContextTests(TestCase, MySetupTestCase):
         )
         for url in url_list:
             cache.clear()
-            response = cls.authorized_client.get(url)
+            response = self.authorized_client.get(url)
             with self.subTest(url=url):
                 post_img = response.context['page'][-1].image
                 self.assertTrue(path.exists(post_img.path))
@@ -162,91 +276,121 @@ class PostsContextTests(TestCase, MySetupTestCase):
         """Check image context in post."""
         cls = self.__class__
         url = cls.url_post
-        response = cls.authorized_client.get(url)
+        response = self.authorized_client.get(url)
         post_img = response.context['post'].image
         self.assertTrue(path.exists(post_img.path))
 
 
-class PaginatorViewsTest(TestCase, MySetupTestCase):
+class PaginatorViewsTestCase(TestCase):
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        MySetupTestCase.setUpClass()
-        cls.less_ten = 3
-        cls.page_count = DELTA_PAGE_COUNT * 2 + cls.less_ten
+        cls.user = User.objects.create(username='user_PaginatorViewsTestCase')
+        cls.group = Group.objects.create(
+            title='Тест PaginatorViewsTestCase',
+            slug='test_PaginatorViewsTestCase',
+            description='Текст_PaginatorViewsTestCase',
+        )
+        # MAX_PAGE_COUNT - Число постов на странице. (по умолчанию 10)
+        # DELTA_PAGE_COUNT - Число страниц отображаемых в пагинаторе
+        # относительно текущей.  (по умолчанию 1)
+        cls.less_ten = 3  # количество постов на последней странице
+        # Вычисляю количество полных страниц.
+        cls.page_count = DELTA_PAGE_COUNT * 2 + 3
+        # Создаю необходимое количество постов,
         cls.posts = tuple(
             Post.objects.create(text=f'Тест {count}', author=cls.user,
                                 group=cls.group) for count in
             range(cls.page_count * MAX_PAGE_COUNT + cls.less_ten)
         )
+        cls.url_index = reverse('index')
+        cls.url_group = reverse('group', kwargs={'slug': cls.group.slug})
+        cls.url_profile = reverse(
+            'profile',
+            kwargs={'username': cls.user.username}
+        )
+        cls.url_follow_index = reverse('follow_index')
 
-    @classmethod
-    def tearDownClass(cls):
-        MySetupTestCase.tearDownClass()
-        super().tearDownClass()
+    def setUp(self):
+        cache.clear()
 
     def test_my_paginator_return_context(self):
         """Check my_paginator function on correct return"""
-        pages = self.page_count + 1
+        pages = self.page_count + 1  # Полное число страниц
         check_context = (
-            (
+            #(
+            #    page_number, - Номер страници для демонстрацыи
+            #    from_page, - Нчинать отображение номеров страниц с этой
+            #    to_page, - Отображать страницы до этой
+            #    page_count - Число постов на отображаемой страние.
+            #),
+            (  # Предыдущая, _1_, 2, ..., 6, Следующая
                 1,
                 2,
-                DELTA_PAGE_COUNT + 1,
+                min(pages - 1, DELTA_PAGE_COUNT + 1),
                 MAX_PAGE_COUNT
             ),
-            (
+            (  # Предыдущая, 1, _2_, 3, ..., 6, Следующая
                 2,
                 max(2, 2 - DELTA_PAGE_COUNT),
-                2 + DELTA_PAGE_COUNT,
+                min(pages - 1, 2 + DELTA_PAGE_COUNT),
                 MAX_PAGE_COUNT
             ),
-            (
+            (  # Предыдущая, 1, 2, _3_, 4, ..., 6, Следующая
                 3,
                 max(2, 3 - DELTA_PAGE_COUNT),
-                3 + DELTA_PAGE_COUNT,
+                min(pages - 1, 3 + DELTA_PAGE_COUNT),
                 MAX_PAGE_COUNT
             ),
-            (
+            (  # Предыдущая, 1, ..., 5, _6_, Следующая
                 pages,
-                pages - DELTA_PAGE_COUNT,
+                max(2, pages - DELTA_PAGE_COUNT),
                 pages - 1,
-                self.less_ten
+                self.less_ten  # На странице только 3 поста вместо 10
             ),
-            (
+            (  # Предыдущая, 1, ..., 4, _5_, 6, Следующая
                 pages - 1,
-                pages - 1 - DELTA_PAGE_COUNT,
+                max(2, pages - 1 - DELTA_PAGE_COUNT),
                 min(pages - 1, pages - 1 + DELTA_PAGE_COUNT),
                 MAX_PAGE_COUNT
             ),
-            (
+            (  # Предыдущая, 1, ..., 3, _4_, 5, 6, Следующая
                 pages - 2,
-                pages - 2 - DELTA_PAGE_COUNT,
+                max(2, pages - 2 - DELTA_PAGE_COUNT),
                 min(pages - 1, pages - 2 + DELTA_PAGE_COUNT),
                 MAX_PAGE_COUNT
             ),
-            (
+            (  # Предыдущая, 1, 2, _3_, 4, ..., 6, Следующая
                 pages // 2,
-                pages // 2 - DELTA_PAGE_COUNT,
-                pages // 2 + DELTA_PAGE_COUNT,
+                max(2, pages // 2 - DELTA_PAGE_COUNT),
+                min(pages - 1, pages // 2 + DELTA_PAGE_COUNT),
                 MAX_PAGE_COUNT
             ),
         )
+        """
+        Я тестирую свою функцию пагинатора на то что при любом поступающем 
+        наборе данных она передаст правильные значения в ответ. После этого не
+        будет необходимости тестировать то что пагинатор передаёт корректный
+        контекст в каждую функцию, а только что соответствующий контекст в
+        принципе передаётся. 
+        """
         for page_number, from_page, to_page, page_count in check_context:
-            with self.subTest(page_number=page_number):
-                paginator = my_paginator(self.__class__.posts, page_number)
-                self.assertEqual(
-                    len(paginator.get('page')),
-                    page_count
-                )
-                self.assertEqual(
-                    paginator.get('from_page'),
-                    from_page
-                )
-                self.assertEqual(
-                    paginator.get('to_page'),
-                    to_page
-                )
+            if 1 <= page_number <= pages:
+                with self.subTest(page_number=page_number):
+                    paginator = my_paginator(self.__class__.posts, page_number)
+                    self.assertEqual(
+                        len(paginator.get('page')),
+                        page_count
+                    )
+                    self.assertEqual(
+                        paginator.get('from_page'),
+                        from_page
+                    )
+                    self.assertEqual(
+                        paginator.get('to_page'),
+                        to_page
+                    )
 
     def test_paginator_in_context(self):
         """Checks the pass of the paginator's parameters to the context"""
@@ -259,73 +403,96 @@ class PaginatorViewsTest(TestCase, MySetupTestCase):
         )
         for url in check_context:
             cache.clear()
-            response = cls.authorized_client.get(url)
+            authorized_client = Client()
+            authorized_client.force_login(cls.user)
+            response = authorized_client.get(url)
             with self.subTest(url=url):
                 self.assertIn('page', response.context)
                 self.assertIn('from_page', response.context)
                 self.assertIn('to_page', response.context)
+                # Проверяем значения для 1_ой страницы
+                self.assertIsInstance(response.context['page'], Page)
+                self.assertEqual(response.context['from_page'], 2)
+                count = min(response.context['page'].paginator.num_pages-1,
+                            DELTA_PAGE_COUNT+1)
+                self.assertEqual(
+                    response.context['to_page'],
+                    count
+                )
 
 
-class CashViewsTest(TestCase, MySetupTestCase):
+class CacheViewsTestCase(TestCase):
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        MySetupTestCase.setUpClass()
+        cls.user = User.objects.create(username='user_CacheViewsTestCase')
+        cls.post = Post.objects.create(
+            text='Тест CacheViewsTestCase',
+            author=cls.user,
+        )
+        cls.url_index = reverse('index')
 
-    @classmethod
-    def tearDownClass(cls):
-        MySetupTestCase.tearDownClass()
-        super().tearDownClass()
+    def setUp(self):
+        cache.clear()
 
-    def test_index_page_cash(self):
+    def test_index_page_cache(self):
         """Check caching of the index.html (url '/')."""
         cls = self.__class__
+        # Базовое значение поста
         post_start = Post.objects.get(id=cls.post.pk)
+        # Получаем страницу, создаём кеш
         self.client.get(cls.url_index)
+        # Меняем пост
         cls.post.text = f'Edit post chash. {id(cls.post)}'
         cls.post.save()
+        # Убеждаемся что кэш работает, страница кэширована
         post_edit = Post.objects.get(id=cls.post.pk)
-        self.assertNotEqual(post_start.text, post_edit.text)
         response = self.client.get(cls.url_index)
         content = response.content.decode(errors='xmlcharrefreplace')
         self.assertIn(post_start.text, content)
         self.assertNotIn(post_edit.text, content)
-        sleep(CACHE_TTL + 1)
+        # Имитируем тайм аут для кэша
+        cache.clear()
+        # Убеждаемся что страница обновилась.
         response = self.client.get(cls.url_index)
         content = response.content.decode(errors='xmlcharrefreplace')
         self.assertNotIn(post_start.text, content)
         self.assertIn(post_edit.text, content)
 
 
-class FollowTest(TestCase, MySetupTestCase):
+class FollowTestCase(TestCase):
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        MySetupTestCase.setUpClass()
+        cls.user = User.objects.create(username='user_FollowTestCase')
+        cls.user_follow = User.objects.create(
+            username='user_follow FollowTestCase',
+        )
+        cls.post_follow = Post.objects.create(
+            text=f'test_follow. {id(cls.user_follow)}',
+            author=cls.user_follow,
+        )
+        cls.url_follow_index = reverse('follow_index')
+        cls.post = Post.objects.create(
+            text='Тест ' * 100,
+            author=cls.user,
+        )
+        cls.follow = Follow.objects.create(user=cls.user,
+                                           author=cls.user_follow)
 
-    @classmethod
-    def tearDownClass(cls):
-        MySetupTestCase.tearDownClass()
-        super().tearDownClass()
-
-    def test_auth_user_unfollow_follow(self):
-        """Check unsubscribe and subscribe function."""
-        cls = self.__class__
-
-        cls.authorized_client.post(cls.url_profile_unfollow)
-        response = cls.authorized_client.post(cls.url_follow_index)
-        self.assertNotIn(cls.post_follow, response.context['page'])
-
-        cls.authorized_client.post(cls.url_profile_follow)
-        response = cls.authorized_client.post(cls.url_follow_index)
-        self.assertIn(cls.post_follow, response.context['page'])
+    def setUp(self):
+        cache.clear()
 
     def test_auth_user_follow_index(self):
         """Check correct showing posts on follow_index url.
 
         Checks that the user sees his posts."""
         cls = self.__class__
-        response = cls.authorized_client.post(cls.url_follow_index)
+        authorized_client = Client()
+        authorized_client.force_login(cls.user)
+        response = authorized_client.post(cls.url_follow_index)
         self.assertIn(cls.post_follow, response.context['page'])
 
     def test_wrong_auth_user_follow_index(self):
@@ -333,34 +500,7 @@ class FollowTest(TestCase, MySetupTestCase):
 
         Checks that the user doesn't see some other posts."""
         cls = self.__class__
-        wrong_user = User.objects.create(
-            username='wrong_user',
-        )
-        cls.authorized_client.force_login(wrong_user)
-        response = cls.authorized_client.post(cls.url_follow_index)
+        authorized_client = Client()
+        authorized_client.force_login(cls.user_follow)
+        response = authorized_client.post(cls.url_follow_index)
         self.assertNotIn(cls.post, response.context['page'])
-        cls.authorized_client.force_login(cls.user)
-
-
-class CommentsTest(TestCase, MySetupTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        MySetupTestCase.setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        MySetupTestCase.tearDownClass()
-        super().tearDownClass()
-
-    def test_auth_user_add_comment(self):
-        """Checking the addition of a comment."""
-        cls = self.__class__
-        context = {
-            'text': f'Текст комментария для posta {cls.post.pk} {id(cls.post)}'
-        }
-        cls.authorized_client.post(cls.url_add_comment, data=context)
-        comment = Comment.objects.filter(text=context['text']).last()
-        response = self.client.get(cls.url_post)
-        comments = response.context['post'].comments.all()
-        self.assertIn(comment, comments)

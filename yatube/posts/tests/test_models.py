@@ -1,27 +1,28 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from .test_setups import MySetupTestCase
+from posts.models import Group, Post
 
 
-class ModelTest(TestCase, MySetupTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        MySetupTestCase.setUpClass()
+class ModelTestCase(TestCase):
 
-    @classmethod
-    def tearDownClass(cls):
-        MySetupTestCase.tearDownClass()
-        super().tearDownClass()
-
-    def test_post_object_text_field(self):
-        """Check __str__, it must return self.text[:15]."""
-        cls = self.__class__
-        result_str = cls.post.text[:15]
-        self.assertEqual(result_str, str(cls.post))
-
-    def test_group_object_title_field(self):
-        """Check __str__, it must return self.title."""
-        cls = self.__class__
-        result_str = cls.group.title
-        self.assertEqual(result_str, str(cls.group))
+    def test_object_text_field(self):
+        """Check __str__"""
+        user = get_user_model().objects.create(username='user_ModelTestCase')
+        group = Group.objects.create(
+            title='Тест_ModelTestCase',
+            slug='test_ModelTestCase',
+            description='Текст_ModelTestCase',
+        )
+        post = Post.objects.create(
+            text='Тест_ModelTestCase',
+            author=user,
+            group=group,
+        )
+        model_string = (
+            (post.text[:15], str(post)),
+            (group.title, str(group)),
+        )
+        for my_model, str_model in model_string:
+            with self.subTest(exept_str=post.text[:15], chk_str=str_model):
+                self.assertEqual(my_model, str_model)

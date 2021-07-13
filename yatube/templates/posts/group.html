@@ -2,9 +2,8 @@
 {% block title %}Записи сообщества {{ group.title }}{% endblock %}
 {% block header %}{{ group.title }}{% endblock %}
 {% block content %}
-  {% load thumbnail %}
   <p>
-    {{ group.description }}
+    {{ group.description|linebreaks }}
   </p>
   <div class="container">
     {% for post in page %}

@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, Page
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_http_methods
@@ -26,7 +26,7 @@ def my_paginator(
     paginator = Paginator(page_list, count)
     page = paginator.get_page(page_number)
     from_page = max(page.number - dcount, 2)
-    to_page = min(page.number + dcount, paginator.num_pages - 1)
+    to_page = min(page.number + dcount, paginator.num_pages-1)
     return {
         'from_page': from_page,
         'to_page': to_page,
@@ -34,6 +34,7 @@ def my_paginator(
     }
 
 
+#@cache_page_per_user(CACHE_TTL, 'index_page')
 @cache_page(CACHE_TTL, key_prefix='index_page')
 def index(request):
     """Return page with MAX_PAGE_COUNT posts."""
@@ -62,10 +63,9 @@ def profile(request, username):
     user = get_object_or_404(User, username=username)
     post_list = user.posts.all()
     paginator = my_paginator(post_list, request.GET.get('page'))
-    if request.user.is_anonymous:
-        following = False
-    else:
-        following = request.user.follower.filter(author=user).exists()
+
+    following = request.user.is_authenticated and \
+                request.user.follower.filter(author=user).exists()
     context = {
         **paginator,
         'author': user,
@@ -77,31 +77,27 @@ def profile(request, username):
 def post_view(request, username, post_id):
     """Shows the selected post."""
     post = get_object_or_404(Post, pk=post_id, author__username=username)
-    form = CommentForm()
-    if request.user.is_authenticated:
-        form.instance = Comment(author=request.user, post=post)
+    form = CommentForm(request.GET or None)
     context = {'form': form, 'post': post}
     return render(request, 'posts/post.html', context)
 
 
-@require_http_methods(['POST'])
 @login_required
+@require_http_methods(('POST'))
 def add_comment(request, username, post_id):
     """Add new post's comment in blog."""
-    post = get_object_or_404(Post, pk=post_id)
+    post = get_object_or_404(Post, pk=post_id, author__username=username)
     form = CommentForm(
         request.POST,
         instance=Comment(author=request.user, post=post)
     )
     if form.is_valid():
         form.save()
-        return redirect('post', username=username, post_id=post_id)
-    context = {'form': form, 'edit': False}
-    return render(request, 'posts/post.html', context)
+    return redirect('post', username=username, post_id=post_id)
 
 
-@require_http_methods(['GET', 'POST'])
 @login_required
+@require_http_methods(('GET', 'POST'))
 def new_post(request):
     """Add new record in blog.
 
@@ -119,11 +115,11 @@ def new_post(request):
     if form.is_valid():
         form.save()
         return redirect('index')
-    context = {'form': form, 'edit': False}
+    context = {'form': form}
     return render(request, 'posts/manage_post.html', context)
 
 
-@require_http_methods(['GET', 'POST'])
+@require_http_methods(('GET', 'POST'))
 @login_required
 def post_edit(request, username, post_id):
     """Edit record in blog.
@@ -145,18 +141,16 @@ def post_edit(request, username, post_id):
     if form.is_valid():
         form.save()
         return redirect('post', username=username, post_id=post_id)
-    context = {'post': post, 'form': form, 'edit': True}
+    context = {'post': post, 'form': form}
     return render(request, 'posts/manage_post.html', context)
 
 
-@require_http_methods(['POST'])
 @login_required
+@require_http_methods(('POST'))
 def post_delete(request, username, post_id):
     """Delete the author's post."""
-    post = get_object_or_404(Post, pk=post_id, author__username=username)
-    if post.author == request.user:
-        post.delete()
-    return redirect('profile', username=request.user.username)
+    Post.objects.filter(pk=post_id, author__username=username).delete()
+    return redirect(request.POST['this_url'])
 
 
 def page_not_found(request, exception=None):
@@ -179,9 +173,17 @@ def server_error(request):
 @login_required
 def follow_index(request):
     """Return a page with posts by subscribed authors."""
+    #authors = request.user.follower.all()
     authors = [follow.author for follow in request.user.follower.all()]
+    #authors = request.user.following.follower.all()
+    #print(authors)
     post_list = Post.objects.select_related('author').filter(
-        author__in=authors)
+    #    author__folling__union=request.user.follower.all())
+        author__in = authors)
+
+    #authors = request.user.select_related('followers').select_related('follow')
+    #post_list = Post.objects.all().intersection(authors)
+
     context = my_paginator(
         post_list,
         request.GET.get('page'),
@@ -193,18 +195,14 @@ def follow_index(request):
 def profile_follow(request, username):
     """Subscribe the user on the author."""
     author = get_object_or_404(User, username=username)
-    if request.user.follower.filter(author=author).exists():
-        return redirect('profile', username=username)
     if request.user != author:
-        Follow.objects.create(user=request.user, author=author)
+        Follow.objects.get_or_create(user=request.user, author=author)
     return redirect('profile', username=username)
 
 
 @login_required
 def profile_unfollow(request, username):
     """Unsubscribe the user from the author."""
-    author = get_object_or_404(User, username=username)
-    if request.user.follower.filter(author=author).exists():
-        follow = request.user.follower.filter(author=author).get()
-        follow.delete()
+    Follow.objects.filter(author__username=username,
+                          user=request.user).delete()
     return redirect('profile', username=username)

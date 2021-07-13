@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Q, F
+from django.db.models import F, Q
 
 User = get_user_model()
 
@@ -22,7 +22,6 @@ class Group(models.Model):
     )
     description = models.TextField(
         blank=True,
-        null=True,
         verbose_name='Описание',
         help_text='Тема групп. Можно не выбирать.',
     )
@@ -30,7 +29,7 @@ class Group(models.Model):
     class Meta:
         verbose_name = 'Группа'
         verbose_name_plural = 'Группы'
-        ordering = ('title', 'slug')
+        ordering = ('title',)
 
     def __str__(self):
         return self.title
@@ -127,7 +126,7 @@ class Follow(models.Model):
         verbose_name = 'Подписка'
         verbose_name_plural = 'Подписки'
         ordering = ('user', 'author')
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=('user', 'author'),
                 name='unique_user_author',
@@ -136,4 +135,4 @@ class Follow(models.Model):
                 check=~Q(user=F('author')),
                 name='nama_not_author',
             )
-        ]
+        )

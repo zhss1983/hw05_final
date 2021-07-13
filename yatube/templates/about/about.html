@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+  <div class="row">
+    <div class="col-md-3 mb-3 mt-1">
+      <div class="card">
+        <div class="card-body">
+          {% block about_profile %}{% endblock %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-9">
+      <div class="card-body">
+        <div class="card-text">
+          {% block about_content %}{% endblock %}
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

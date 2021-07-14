@@ -174,8 +174,8 @@ def server_error(request):
 def follow_index(request):
     """Return a page with posts by subscribed authors."""
     authors = request.user.follower.values_list('author')
-    post_list = Post.objects.filter(author__in=authors).select_related(
-        'author')
+    post_list = Post.objects.filter(author__in=authors).prefetch_related(
+        'author','group')
     context = my_paginator(
         post_list,
         request.GET.get('page'),

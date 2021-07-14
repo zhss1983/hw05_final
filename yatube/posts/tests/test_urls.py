@@ -2,9 +2,8 @@ from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
-from django.test import Client
 
 from posts.forms import PostForm
 from posts.models import Follow, Group, Post
@@ -17,6 +16,9 @@ class PostsURLTestsCase(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.user = User.objects.create(username='user_PostsURLTestsCase')
+        cls.user_follow = User.objects.create(
+            username='user_follow',
+        )
         cls.user_follow = User.objects.create(
             username='user_follow_PostsURLTestsCase',
         )
@@ -68,7 +70,7 @@ class PostsURLTestsCase(TestCase):
         )
         cls.url_profile_unfollow = reverse(
             'profile_unfollow',
-            kwargs={'username': cls.user_follow.username}
+            kwargs={'username': cls.user.username}
         )
         cls.url_follow_index = reverse('follow_index')
         cls.url_add_comment = reverse(
@@ -107,7 +109,7 @@ class PostsURLTestsCase(TestCase):
             (cls.url_profile_follow, f'/{cls.user_follow.username}/follow/'),
             (cls.url_post_edit, f'/{cls.user.username}/{cls.post.pk}/edit/'),
             (cls.url_profile_unfollow,
-             f'/{cls.user_follow.username}/unfollow/'),
+             f'/{cls.user.username}/unfollow/'),
             (cls.url_add_comment,
              f'/{cls.user.username}/{cls.post.pk}/comment/'),
             (cls.url_post_delete,
@@ -164,3 +166,40 @@ class PostsURLTestsCase(TestCase):
             response = self.client.get(url)
             with self.subTest(url=url):
                 self.assertRedirects(response, f'{url_login}?next={url}')
+
+    def test_auth_wrong_user_get_edit_post_and_correct_redirect(self):
+        """Check wrong user could'nt edit post and correct redirect."""
+        cls = self.__class__
+        wrong_user = User.objects.create(
+            username='wrong_user',
+        )
+        wrong_client = Client()
+        wrong_client.force_login(wrong_user)
+        response = wrong_client.get(cls.url_post_edit)
+        self.assertRedirects(response, cls.url_post)
+
+    def test_auth_user_get_follow_redirect(self):
+        """Check get request redirect."""
+        cls = self.__class__
+        authorized_client = Client()
+        authorized_client.force_login(cls.user)
+        following_profile = reverse(
+            'profile',
+            kwargs={'username': cls.user_follow.username}
+        )
+        # Подписываюсь
+        response = authorized_client.get(cls.url_profile_follow)
+        self.assertRedirects(response, following_profile)
+
+    def test_auth_user_unfollow(self):
+        """Check get request redirect."""
+        cls = self.__class__
+        authorized_client = Client()
+        authorized_client.force_login(cls.user_follow)
+        Follow.objects.create(author=cls.user, user=cls.user_follow)
+        following_profile = reverse(
+            'profile',
+            kwargs={'username': cls.user.username}
+        )
+        response = authorized_client.get(cls.url_profile_unfollow)
+        self.assertRedirects(response, following_profile)

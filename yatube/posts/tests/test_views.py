@@ -11,7 +11,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from posts.forms import PostForm
-from posts.models import Comment, Follow, Group, Post, User
+from posts.models import Group, Post
 from posts.views import my_paginator
 from yatube.settings import DELTA_PAGE_COUNT, MAX_PAGE_COUNT
 
@@ -246,6 +246,12 @@ class PostsContextTestsCase(TestCase):
                 ('year', year),
             ),
         )
+        """Проверка на то, что контекст содержит соответствующие переменные по
+        наличию и их значению. Для поста, группы и автора заранее известны
+        точные посты, группы и авторы, проверяется лишь факт наличия их и того
+        что вместо них не передаётся что-то иное, сравинвать каждое поле нет
+        необходимости и смысла.
+        """
         cache.clear()
         for url, *context in url_list:
             response = self.authorized_client.get(url)
@@ -290,8 +296,7 @@ class PaginatorViewsTestCase(TestCase):
             slug='test_PaginatorViewsTestCase',
             description='Текст_PaginatorViewsTestCase',
         )
-        """
-        MAX_PAGE_COUNT - Число постов на странице. (по умолчанию 10)
+        """MAX_PAGE_COUNT - Число постов на странице. (по умолчанию 10)
         DELTA_PAGE_COUNT - Число страниц отображаемых в пагинаторе относительно
         текущей. (DELTA_PAGE_COUNT = 1 if DEBUG else 10)
         """
@@ -316,12 +321,12 @@ class PaginatorViewsTestCase(TestCase):
         """Check my_paginator function on correct return"""
         pages = self.page_count + 1  # Полное число страниц
         check_context = (
-            #(
-            #    page_number, - Номер страници для демонстрацыи
-            #    from_page, - Нчинать отображение номеров страниц с этой
-            #    to_page, - Отображать страницы до этой
-            #    page_count - Число постов на отображаемой страние.
-            #),
+            # (
+            #     page_number, - Номер страници для демонстрацыи
+            #     from_page, - Нчинать отображение номеров страниц с этой
+            #     to_page, - Отображать страницы до этой
+            #     page_count - Число постов на отображаемой страние.
+            # ),
             (  # Предыдущая, _1_, 2, ..., 6, Следующая
                 1,
                 2,
@@ -365,12 +370,11 @@ class PaginatorViewsTestCase(TestCase):
                 MAX_PAGE_COUNT
             ),
         )
-        """
-        Я тестирую свою функцию пагинатора на то что при любом поступающем 
+        """Я тестирую свою функцию пагинатора на то что при любом поступающем
         наборе данных она передаст правильные значения в ответ. После этого не
         будет необходимости тестировать то что пагинатор передаёт корректный
         контекст в каждую функцию, а только что соответствующий контекст в
-        принципе передаётся. 
+        принципе передаётся.
         """
         for page_number, from_page, to_page, page_count in check_context:
             if 1 <= page_number <= pages:
@@ -390,7 +394,12 @@ class PaginatorViewsTestCase(TestCase):
                     )
 
     def test_paginator_in_context(self):
-        """Checks the pass of the paginator's parameters to the context"""
+        """Checks the pass of the paginator's parameters to the context
+
+        It is not the test of the paginator's work, but the test that
+        it is in the context. Also it is checked that something else is not
+        transmitted under the guise of a paginator.
+        """
         cls = self.__class__
         check_context = (
             cls.url_index,
@@ -410,8 +419,8 @@ class PaginatorViewsTestCase(TestCase):
                 # Проверяем значения для 1_ой страницы
                 self.assertIsInstance(response.context['page'], Page)
                 self.assertEqual(response.context['from_page'], 2)
-                count = min(response.context['page'].paginator.num_pages-1,
-                            DELTA_PAGE_COUNT+1)
+                count = min(response.context['page'].paginator.num_pages - 1,
+                            DELTA_PAGE_COUNT + 1)
                 self.assertEqual(
                     response.context['to_page'],
                     count
@@ -424,33 +433,22 @@ class CacheViewsTestCase(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.user = User.objects.create(username='user_CacheViewsTestCase')
-        cls.post = Post.objects.create(
-            text='Тест CacheViewsTestCase',
-            author=cls.user,
-        )
         cls.url_index = reverse('index')
 
     def test_index_page_cache(self):
         """Check caching of the index.html (url '/')."""
         cls = self.__class__
         cache.clear()
-        # Базовое значение поста
-        post_start = Post.objects.get(id=cls.post.pk)
-        # Получаем страницу, создаём кеш
-        self.client.get(cls.url_index)
-        # Меняем пост
-        cls.post.text = f'Edit post chash. {id(cls.post)}'
-        cls.post.save()
-        # Убеждаемся что кэш работает, страница кэширована
-        post_edit = Post.objects.get(id=cls.post.pk)
+        post = Post.objects.create(
+            text='Тест CacheViewsTestCase',
+            author=cls.user,
+        )
         response = self.client.get(cls.url_index)
-        content = response.content.decode(errors='xmlcharrefreplace')
-        self.assertIn(post_start.text, content)
-        self.assertNotIn(post_edit.text, content)
-        # Имитируем тайм аут для кэша
+        content_start = response.content
+        post.text = f'Edit post chash. {id(post)}'
+        post.save()
+        response = self.client.get(cls.url_index)
+        self.assertEqual(content_start, response.content)
         cache.clear()
-        # Убеждаемся что страница обновилась.
         response = self.client.get(cls.url_index)
-        content = response.content.decode(errors='xmlcharrefreplace')
-        self.assertNotIn(post_start.text, content)
-        self.assertIn(post_edit.text, content)
+        self.assertNotEqual(content_start, response.content)

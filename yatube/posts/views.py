@@ -27,12 +27,13 @@ def my_paginator(
     paginator = Paginator(page_list, count)
     page = paginator.get_page(page_number)
     from_page = max(page.number - dcount, 2)
-    to_page = min(page.number + dcount, paginator.num_pages-1)
+    to_page = min(page.number + dcount, paginator.num_pages - 1)
     return {
         'from_page': from_page,
         'to_page': to_page,
         'page': page,
     }
+
 
 @cache_page(CACHE_TTL, key_prefix='index_page')
 @vary_on_cookie
@@ -64,8 +65,8 @@ def profile(request, username):
     post_list = user.posts.all()
     paginator = my_paginator(post_list, request.GET.get('page'))
 
-    following = request.user.is_authenticated and \
-                request.user.follower.filter(author=user).exists()
+    following = request.user.is_authenticated and request.user.follower.filter(
+        author=user).exists()
     context = {
         **paginator,
         'author': user,
@@ -183,6 +184,7 @@ def follow_index(request):
 
 
 @login_required
+#  @require_POST хотел избавиться от get запроса, не получилось, тесты требуют
 def profile_follow(request, username):
     """Subscribe the user on the author."""
     author = get_object_or_404(User, username=username)
@@ -192,6 +194,7 @@ def profile_follow(request, username):
 
 
 @login_required
+#  @require_POST хотел избавиться от get запроса, не получилось, тесты требуют
 def profile_unfollow(request, username):
     """Unsubscribe the user from the author."""
     Follow.objects.filter(author__username=username,

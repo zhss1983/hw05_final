@@ -53,13 +53,6 @@ class PostsTestsCase(TestCase):
                 'post_id': cls.post.pk
             }
         )
-        cls.url_post_delete = reverse(
-            'post_delete',
-            kwargs={
-                'username': cls.user.username,
-                'post_id': cls.post.pk
-            }
-        )
         cls.url_profile_follow = reverse(
             'profile_follow',
             kwargs={'username': cls.user_follow.username}
@@ -71,6 +64,13 @@ class PostsTestsCase(TestCase):
         cls.url_follow_index = reverse('follow_index')
         cls.url_add_comment = reverse(
             'add_comment',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': cls.post.pk
+            }
+        )
+        cls.url_post_delete = reverse(
+            'post_delete',
             kwargs={
                 'username': cls.user.username,
                 'post_id': cls.post.pk
@@ -115,7 +115,7 @@ class PostsTestsCase(TestCase):
             data=context
         )
         self.assertTrue(Post.objects.filter(text=context['text']).exists())
-        self.assertEqual(Post.objects.count(), count+1)
+        self.assertEqual(Post.objects.count(), count + 1)
         post = Post.objects.first()
         self.assertRedirects(response, cls.url_index)
         self.assertEqual(post.author, cls.user)
@@ -204,10 +204,17 @@ class PostsTestsCase(TestCase):
     def test_delete_url_redirect_post(self):
         """Check redirect for an authorized user."""
         cls = self.__class__
-        this_url = f'/some_strange_DELETE_URL/'
+        url_post_delete = reverse(
+            'post_delete',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': cls.post.pk
+            }
+        )
+        this_url = '/some_strange_DELETE_URL/'
         authorized_client = Client()
         authorized_client.force_login(cls.user)
-        response = authorized_client.post(cls.url_post_delete,
+        response = authorized_client.post(url_post_delete,
                                           {'this_url': this_url})
         """
         Не применяю assertRedirects т.к. далее происходит переброска на
@@ -279,7 +286,7 @@ class CommentsTestCase(TestCase):
         authorized_client.force_login(cls.user)
         resp = authorized_client.post(cls.url_add_comment, data=context)
         self.assertRedirects(resp, cls.url_post)
-        self.assertEqual(count+1, Comment.objects.count())
+        self.assertEqual(count + 1, Comment.objects.count())
         comment = Comment.objects.first()
         self.assertEqual(comment.text, context['text'])
         response = self.client.get(cls.url_post)
@@ -298,7 +305,6 @@ class CommentsTestCase(TestCase):
         comment = Comment.objects.first()
         self.assertFalse(comment,
                          Comment.objects.filter(text=context['text']).exists())
-
         if comment is not None:
             self.assertNotEqual(comment.text, context['text'])
         response = self.client.get(cls.url_post)
@@ -334,10 +340,7 @@ class FollowTestCase(TestCase):
         cls.url_follow_index = reverse('follow_index')
 
     def test_auth_user_follow(self):
-        """Check unsubscribe and subscribe function.
-
-        Tests first subscribing to the author, and then unsubscribing from him.
-        """
+        """Check subscribe function."""
         cls = self.__class__
         authorized_client = Client()
         authorized_client.force_login(cls.user)
@@ -359,10 +362,7 @@ class FollowTestCase(TestCase):
         self.assertIn(cls.post_follow, response.context['page'])
 
     def test_auth_user_unfollow(self):
-        """Check unsubscribe and subscribe function.
-
-        Tests first subscribing to the author, and then unsubscribing from him.
-        """
+        """Check unsubscribe function."""
         cls = self.__class__
         authorized_client = Client()
         authorized_client.force_login(cls.user_follow)

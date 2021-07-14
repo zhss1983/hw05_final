@@ -192,7 +192,7 @@ class PostsURLTestsCase(TestCase):
         response = authorized_client.get(cls.url_profile_follow)
         self.assertRedirects(response, following_profile)
 
-    def test_auth_user_unfollow(self):
+    def test_auth_get_user_unfollow(self):
         """Check get request redirect."""
         cls = self.__class__
         authorized_client = Client()

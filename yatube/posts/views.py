@@ -39,7 +39,9 @@ def my_paginator(
 @vary_on_cookie
 def index(request):
     """Return page with MAX_PAGE_COUNT posts."""
-    post_list = Post.objects.select_related('author')
+    post_list = Post.objects.select_related('author',
+                                            'group').prefetch_related(
+        'comments')
     context = my_paginator(
         post_list,
         request.GET.get('page'),
@@ -50,7 +52,8 @@ def index(request):
 def group_posts(request, slug):
     """Return the MAX_PAGE_COUNT posts in the selected group."""
     group = get_object_or_404(Group, slug=slug)
-    post_list = group.posts.select_related('author')
+    post_list = group.posts.select_related('author').prefetch_related(
+        'comments')
     paginator = my_paginator(post_list, request.GET.get('page'))
     context = {
         **paginator,
@@ -62,7 +65,8 @@ def group_posts(request, slug):
 def profile(request, username):
     """Shows user profile"""
     user = get_object_or_404(User, username=username)
-    post_list = user.posts.select_related('author')
+    post_list = user.posts.select_related('author','group').prefetch_related(
+        'comments')
     paginator = my_paginator(post_list, request.GET.get('page'))
     following = request.user.is_authenticated and request.user.follower.filter(
         author=user).exists()
@@ -174,8 +178,8 @@ def server_error(request):
 def follow_index(request):
     """Return a page with posts by subscribed authors."""
     authors = request.user.follower.values_list('author')
-    post_list = Post.objects.filter(author__in=authors).prefetch_related(
-        'author', 'group')
+    post_list = Post.objects.filter(author__in=authors).select_related(
+        'author', 'group').prefetch_related('comments')
     context = my_paginator(
         post_list,
         request.GET.get('page'),

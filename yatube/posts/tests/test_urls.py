@@ -10,6 +10,7 @@ from posts.models import Follow, Group, Post
 
 User = get_user_model()
 
+
 class PostsURLTestsCase(TestCase):
 
     @classmethod

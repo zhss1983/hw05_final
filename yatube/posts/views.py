@@ -65,7 +65,7 @@ def group_posts(request, slug):
 def profile(request, username):
     """Shows user profile"""
     user = get_object_or_404(User, username=username)
-    post_list = user.posts.select_related('author','group').prefetch_related(
+    post_list = user.posts.select_related('author', 'group').prefetch_related(
         'comments')
     paginator = my_paginator(post_list, request.GET.get('page'))
     following = request.user.is_authenticated and request.user.follower.filter(

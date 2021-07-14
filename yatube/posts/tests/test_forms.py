@@ -1,25 +1,15 @@
+from http import HTTPStatus
+from os import path
 import shutil
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
-from django.core.files.uploadedfile import SimpleUploadedFile
-
-from posts.models import Follow, Group
-
-User = get_user_model()
-
-
-
-from http import HTTPStatus
-from os import path
-
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Comment, Post
+from posts.models import Comment, Follow, Group, Post
 
 User = get_user_model()
 
@@ -90,6 +80,7 @@ class PostsTestsCase(TestCase):
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
 
     @classmethod
     def img_upload(cls):
@@ -105,9 +96,6 @@ class PostsTestsCase(TestCase):
             ),
             content_type='image/gif'
         )
-
-    def setUp(self):
-        cache.clear()
 
     def test_auth_user_save_post_and_correct_redirect(self):
         """Check save post and correct redirect."""
@@ -128,13 +116,7 @@ class PostsTestsCase(TestCase):
         )
         self.assertTrue(Post.objects.filter(text=context['text']).exists())
         self.assertEqual(Post.objects.count(), count+1)
-
         post = Post.objects.first()
-        #post = Post.objects.last()
-        #chek_last = Post.objects.filter(text=context['text']).get()
-        #self.assertEqual(post, chek_last)
-        #post = Post.objects.filter(text=context['text']).get()
-
         self.assertRedirects(response, cls.url_index)
         self.assertEqual(post.author, cls.user)
         self.assertEqual(post.group, cls.group)
@@ -158,12 +140,7 @@ class PostsTestsCase(TestCase):
             cls.url_post_edit,
             data=context
         )
-
         post = Post.objects.first()
-        #post = Post.objects.last()
-        #chek_last = Post.objects.filter(text=context['text']).get()
-        #self.assertEqual(post, chek_last)
-
         self.assertEqual(Post.objects.count(), count)
         self.assertRedirects(response, cls.url_post)
         self.assertEqual(post.author, cls.user)
@@ -244,7 +221,7 @@ class PostsTestsCase(TestCase):
     def test_list_url_redirect_anonymous(self):
         """Check redirect for an unauthorized user."""
         cls = self.__class__
-        url_index = reverse('login')
+        url_login = reverse('login')
         url_list = (
             cls.url_new_post,
             cls.url_post_edit,
@@ -257,7 +234,7 @@ class PostsTestsCase(TestCase):
         for url in url_list:
             response = self.client.post(url)
             with self.subTest(url=url):
-                self.assertRedirects(response, f'{url_index}?next={url}')
+                self.assertRedirects(response, f'{url_login}?next={url}')
 
 
 class CommentsTestCase(TestCase):
@@ -291,9 +268,6 @@ class CommentsTestCase(TestCase):
             }
         )
 
-    def setUp(self):
-        cache.clear()
-
     def test_auth_user_add_comment(self):
         """Checking the addition of a comment."""
         cls = self.__class__
@@ -306,12 +280,7 @@ class CommentsTestCase(TestCase):
         resp = authorized_client.post(cls.url_add_comment, data=context)
         self.assertRedirects(resp, cls.url_post)
         self.assertEqual(count+1, Comment.objects.count())
-
         comment = Comment.objects.first()
-        #comment = Comment.objects.last()
-        #chek_last = Comment.objects.filter(text=context['text']).get()
-        #self.assertEqual(comment, chek_last)
-
         self.assertEqual(comment.text, context['text'])
         response = self.client.get(cls.url_post)
         comments = response.context['post'].comments.all()
@@ -327,7 +296,6 @@ class CommentsTestCase(TestCase):
         self.client.post(cls.url_add_comment, data=context)
         self.assertEqual(count, Comment.objects.count())
         comment = Comment.objects.first()
-        #comment = Comment.objects.last()
         self.assertFalse(comment,
                          Comment.objects.filter(text=context['text']).exists())
 
@@ -339,6 +307,7 @@ class CommentsTestCase(TestCase):
 
 
 class FollowTestCase(TestCase):
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -364,9 +333,6 @@ class FollowTestCase(TestCase):
         )
         cls.url_follow_index = reverse('follow_index')
 
-    def setUp(self):
-        cache.clear()
-
     def test_auth_user_follow(self):
         """Check unsubscribe and subscribe function.
 
@@ -384,7 +350,6 @@ class FollowTestCase(TestCase):
         response = authorized_client.post(cls.url_profile_follow)
         self.assertRedirects(response, following_profile)
         # Проверяю подписка
-        #follow = Follow.objects.last()
         follow = Follow.objects.first()
         self.assertEqual(follow.user, cls.user)
         self.assertEqual(follow.author, cls.user_follow)

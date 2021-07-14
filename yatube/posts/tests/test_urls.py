@@ -86,9 +86,6 @@ class PostsURLTestsCase(TestCase):
             }
         )
 
-    def setUp(self):
-        cache.clear()
-
     def test_homepage(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -124,11 +121,12 @@ class PostsURLTestsCase(TestCase):
         """Check addres available."""
         cls = self.__class__
         url_list = (
-            cls.url_profile,
             cls.url_index,
+            cls.url_profile,
             cls.url_group,
             cls.url_post,
         )
+        cache.clear()
         for url in url_list:
             with self.subTest(url=url):
                 response = self.client.get(url)

@@ -7,8 +7,8 @@ class TemplateTestCase(TestCase):
     def test_url_uses_correct_template(self):
         """Check matching of template name and URL address."""
         url_list = (
-            ('about:author', 'about/author.html', '/about/author/'),
-            ('about:tech', 'about/tech.html', '/about/tech/'),
+            ('about:author', 'about/author.html'),
+            ('about:tech', 'about/tech.html'),
         )
         for url, template_name in url_list:
             with self.subTest(url=url):

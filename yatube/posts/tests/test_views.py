@@ -25,8 +25,8 @@ class PostsURLTestsCase(TestCase):
         super().setUpClass()
         cls.user = User.objects.create(username='user_PostsURLTestsCase_1')
         cls.group = Group.objects.create(
-            title='Тест_PostsURLTestsCase_1',
-            slug='test_PostsURLTestsCase_1',
+            title='Тест_PostsURLTestsCase',
+            slug='test_PostsURLTestsCase',
             description='Текст_PostsURLTestsCase',
         )
         cls.post = Post.objects.create(
@@ -56,9 +56,6 @@ class PostsURLTestsCase(TestCase):
                 'post_id': cls.post.pk
             }
         )
-
-    def setUp(self):
-        cache.clear()
 
     def test_url_uses_correct_template_by_guest(self):
         """Check matching of template name and URL address."""
@@ -100,19 +97,14 @@ class PostsURLTestsCase(TestCase):
             slug='test_group_2',
             description='Тестовая группа № 2',
         )
-        #print('Число постов после создания', Post.objects.count())
-        #my_post = Post.objects.last()
-        #print('Последний пост:', my_post.pk, my_post.text, my_post.group_id, my_post.pub_date)
         my_post = Post.objects.first()
-        #print('Первый пост:', my_post.pk, my_post.text, my_post.group_id, my_post.pub_date)
-        #print('Ожидаемый пост:', cls.post.pk, cls.post.text, cls.post.group_id, cls.post.pub_date)
         in_list_url = (
-            cls.url_group,
             cls.url_index,
+            cls.url_group,
         )
+        cache.clear()
         for url in in_list_url:
             with self.subTest(url=url):
-                cache.clear()
                 response = authorized_client.get(url)
                 self.assertIn(my_post, response.context['page'].object_list)
         url_new_group = reverse('group', kwargs={'slug': new_group.slug})
@@ -170,6 +162,7 @@ class PostsContextTestsCase(TestCase):
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
 
     @classmethod
     def img_upload(cls):
@@ -187,7 +180,6 @@ class PostsContextTestsCase(TestCase):
         )
 
     def setUp(self):
-        cache.clear()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.__class__.user)
 
@@ -223,6 +215,10 @@ class PostsContextTestsCase(TestCase):
         year = dt.today().year
         url_list = (
             (
+                cls.url_index,
+                ('year', year),
+            ),
+            (
                 cls.url_new_post,
                 ('year', year),
             ),
@@ -250,6 +246,7 @@ class PostsContextTestsCase(TestCase):
                 ('year', year),
             ),
         )
+        cache.clear()
         for url, *context in url_list:
             response = self.authorized_client.get(url)
             for name, value in context:
@@ -261,10 +258,11 @@ class PostsContextTestsCase(TestCase):
         """Check image context in multiposts pages."""
         cls = self.__class__
         url_list = (
+            cls.url_index,
             cls.url_profile,
             cls.url_group,
-            cls.url_index,
         )
+        cache.clear()
         for url in url_list:
             cache.clear()
             response = self.authorized_client.get(url)
@@ -292,9 +290,11 @@ class PaginatorViewsTestCase(TestCase):
             slug='test_PaginatorViewsTestCase',
             description='Текст_PaginatorViewsTestCase',
         )
-        # MAX_PAGE_COUNT - Число постов на странице. (по умолчанию 10)
-        # DELTA_PAGE_COUNT - Число страниц отображаемых в пагинаторе
-        # относительно текущей.  (по умолчанию 1)
+        """
+        MAX_PAGE_COUNT - Число постов на странице. (по умолчанию 10)
+        DELTA_PAGE_COUNT - Число страниц отображаемых в пагинаторе относительно
+        текущей. (DELTA_PAGE_COUNT = 1 if DEBUG else 10)
+        """
         cls.less_ten = 3  # количество постов на последней странице
         # Вычисляю количество полных страниц.
         cls.page_count = DELTA_PAGE_COUNT * 2 + 3
@@ -311,9 +311,6 @@ class PaginatorViewsTestCase(TestCase):
             kwargs={'username': cls.user.username}
         )
         cls.url_follow_index = reverse('follow_index')
-
-    def setUp(self):
-        cache.clear()
 
     def test_my_paginator_return_context(self):
         """Check my_paginator function on correct return"""
@@ -338,9 +335,9 @@ class PaginatorViewsTestCase(TestCase):
                 MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, 2, _3_, 4, ..., 6, Следующая
-                3,
-                max(2, 3 - DELTA_PAGE_COUNT),
-                min(pages - 1, 3 + DELTA_PAGE_COUNT),
+                2 + DELTA_PAGE_COUNT,
+                2,
+                min(pages - 1, 2 + 2 * DELTA_PAGE_COUNT),
                 MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, ..., 5, _6_, Следующая
@@ -356,9 +353,9 @@ class PaginatorViewsTestCase(TestCase):
                 MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, ..., 3, _4_, 5, 6, Следующая
+                pages - 2 - DELTA_PAGE_COUNT,
+                max(2, pages - 2 - 2 * DELTA_PAGE_COUNT),
                 pages - 2,
-                max(2, pages - 2 - DELTA_PAGE_COUNT),
-                min(pages - 1, pages - 2 + DELTA_PAGE_COUNT),
                 MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, 2, _3_, 4, ..., 6, Следующая
@@ -401,8 +398,8 @@ class PaginatorViewsTestCase(TestCase):
             cls.url_profile,
             cls.url_follow_index,
         )
+        cache.clear()
         for url in check_context:
-            cache.clear()
             authorized_client = Client()
             authorized_client.force_login(cls.user)
             response = authorized_client.get(url)
@@ -433,12 +430,10 @@ class CacheViewsTestCase(TestCase):
         )
         cls.url_index = reverse('index')
 
-    def setUp(self):
-        cache.clear()
-
     def test_index_page_cache(self):
         """Check caching of the index.html (url '/')."""
         cls = self.__class__
+        cache.clear()
         # Базовое значение поста
         post_start = Post.objects.get(id=cls.post.pk)
         # Получаем страницу, создаём кеш
@@ -459,48 +454,3 @@ class CacheViewsTestCase(TestCase):
         content = response.content.decode(errors='xmlcharrefreplace')
         self.assertNotIn(post_start.text, content)
         self.assertIn(post_edit.text, content)
-
-
-class FollowTestCase(TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = User.objects.create(username='user_FollowTestCase')
-        cls.user_follow = User.objects.create(
-            username='user_follow FollowTestCase',
-        )
-        cls.post_follow = Post.objects.create(
-            text=f'test_follow. {id(cls.user_follow)}',
-            author=cls.user_follow,
-        )
-        cls.url_follow_index = reverse('follow_index')
-        cls.post = Post.objects.create(
-            text='Тест ' * 100,
-            author=cls.user,
-        )
-        cls.follow = Follow.objects.create(user=cls.user,
-                                           author=cls.user_follow)
-
-    def setUp(self):
-        cache.clear()
-
-    def test_auth_user_follow_index(self):
-        """Check correct showing posts on follow_index url.
-
-        Checks that the user sees his posts."""
-        cls = self.__class__
-        authorized_client = Client()
-        authorized_client.force_login(cls.user)
-        response = authorized_client.post(cls.url_follow_index)
-        self.assertIn(cls.post_follow, response.context['page'])
-
-    def test_wrong_auth_user_follow_index(self):
-        """Check correct showing posts on follow_index url.
-
-        Checks that the user doesn't see some other posts."""
-        cls = self.__class__
-        authorized_client = Client()
-        authorized_client.force_login(cls.user_follow)
-        response = authorized_client.post(cls.url_follow_index)
-        self.assertNotIn(cls.post, response.context['page'])

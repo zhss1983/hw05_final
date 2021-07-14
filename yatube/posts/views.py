@@ -1,10 +1,11 @@
 from http import HTTPStatus
 
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator, Page
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.vary import vary_on_cookie
 
 from .forms import CommentForm, PostForm
 from .models import Comment, Follow, Group, Post, User
@@ -33,9 +34,8 @@ def my_paginator(
         'page': page,
     }
 
-
-#@cache_page_per_user(CACHE_TTL, 'index_page')
 @cache_page(CACHE_TTL, key_prefix='index_page')
+@vary_on_cookie
 def index(request):
     """Return page with MAX_PAGE_COUNT posts."""
     post_list = Post.objects.select_related('author')
@@ -83,7 +83,7 @@ def post_view(request, username, post_id):
 
 
 @login_required
-@require_http_methods(('POST'))
+@require_POST
 def add_comment(request, username, post_id):
     """Add new post's comment in blog."""
     post = get_object_or_404(Post, pk=post_id, author__username=username)
@@ -146,7 +146,7 @@ def post_edit(request, username, post_id):
 
 
 @login_required
-@require_http_methods(('POST'))
+@require_POST
 def post_delete(request, username, post_id):
     """Delete the author's post."""
     Post.objects.filter(pk=post_id, author__username=username).delete()
@@ -173,17 +173,8 @@ def server_error(request):
 @login_required
 def follow_index(request):
     """Return a page with posts by subscribed authors."""
-    #authors = request.user.follower.all()
-    authors = [follow.author for follow in request.user.follower.all()]
-    #authors = request.user.following.follower.all()
-    #print(authors)
-    post_list = Post.objects.select_related('author').filter(
-    #    author__folling__union=request.user.follower.all())
-        author__in = authors)
-
-    #authors = request.user.select_related('followers').select_related('follow')
-    #post_list = Post.objects.all().intersection(authors)
-
+    authors = request.user.follower.values_list('author')
+    post_list = Post.objects.filter(author__in=authors)
     context = my_paginator(
         post_list,
         request.GET.get('page'),

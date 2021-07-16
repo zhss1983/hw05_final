@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load user_tags %}
 {% with card_hader=form.instance.id|yesno:"Редактировать,Добавить," %}
   {% block title %}
     {{ card_hader }} запись
@@ -11,8 +10,9 @@
           <div class="card-header">
             {{ card_hader }} запись
           </div>
-          {% new_variable form.instance.id|yesno:"Сохранить,Добавить" as btn_name %}
-          {% include "includes/form.html" %}
+          {% with btn_name=edit|yesno:"Сохранить,Добавить" %}
+            {% include "includes/form.html" %}
+          {% endwith %}
         </div>
       </div>
     </div>

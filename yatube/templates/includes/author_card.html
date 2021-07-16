@@ -22,7 +22,7 @@
           Записей: {{ author.posts.count }}
         </div>
       </li>
-      {% if user != author and user.is_authenticated %}
+      {% if user != author and user.is_authenticated and page %}
         <li class="list-group-item">
           {% if following %}
             <a
@@ -37,15 +37,6 @@
               Подписаться
             </a>
           {% endif %}
-          <!-- Хотел сделать так, что бы отправлялся только POST запрос.
-          {% url following|yesno:'profile_unfollow,profile_follow,' author.username as follow_url %}
-          <form method="post" action="{{ follow_url }}">
-            {% csrf_token %}
-            <button type="submit" class="{{ following|yesno:'btn btn-lg btn-light,btn btn-lg btn-primary,' }}">
-              {{ following|yesno:"Отписаться,Подписаться," }}
-            </button>
-          </form>
-          -->
         </li>
       {% endif %}
     </ul>

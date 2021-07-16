@@ -39,9 +39,12 @@ def my_paginator(
 @vary_on_cookie
 def index(request):
     """Return page with MAX_PAGE_COUNT posts."""
-    post_list = Post.objects.select_related('author',
-                                            'group').prefetch_related(
-        'comments')
+    post_list = Post.objects.select_related(
+        'author',
+        'group',
+    ).prefetch_related(
+        'comments',
+    )
     context = my_paginator(
         post_list,
         request.GET.get('page'),
@@ -65,8 +68,7 @@ def group_posts(request, slug):
 def profile(request, username):
     """Shows user profile"""
     user = get_object_or_404(User, username=username)
-    post_list = user.posts.select_related('author', 'group').prefetch_related(
-        'comments')
+    post_list = user.posts.select_related('group').prefetch_related('comments')
     paginator = my_paginator(post_list, request.GET.get('page'))
     following = request.user.is_authenticated and request.user.follower.filter(
         author=user).exists()
@@ -81,7 +83,7 @@ def profile(request, username):
 def post_view(request, username, post_id):
     """Shows the selected post."""
     post = get_object_or_404(Post, pk=post_id, author__username=username)
-    form = CommentForm(request.GET or None)
+    form = CommentForm()
     context = {'form': form, 'post': post}
     return render(request, 'posts/post.html', context)
 
@@ -153,7 +155,8 @@ def post_edit(request, username, post_id):
 @require_POST
 def post_delete(request, username, post_id):
     """Delete the author's post."""
-    Post.objects.filter(pk=post_id, author__username=username).delete()
+    post = get_object_or_404(Post, pk=post_id, author__username=username)
+    post.delete()
     return redirect(request.POST['this_url'])
 
 
@@ -177,9 +180,9 @@ def server_error(request):
 @login_required
 def follow_index(request):
     """Return a page with posts by subscribed authors."""
-    authors = request.user.follower.values_list('author')
-    post_list = Post.objects.filter(author__in=authors).select_related(
-        'author', 'group').prefetch_related('comments')
+    post_list = Post.objects.filter(
+        author__following__user=request.user
+    ).select_related('author', 'group').prefetch_related('comments')
     context = my_paginator(
         post_list,
         request.GET.get('page'),
@@ -188,7 +191,6 @@ def follow_index(request):
 
 
 @login_required
-#  @require_POST хотел избавиться от get запроса, не получилось, тесты требуют
 def profile_follow(request, username):
     """Subscribe the user on the author."""
     author = get_object_or_404(User, username=username)
@@ -198,9 +200,10 @@ def profile_follow(request, username):
 
 
 @login_required
-#  @require_POST хотел избавиться от get запроса, не получилось, тесты требуют
 def profile_unfollow(request, username):
     """Unsubscribe the user from the author."""
-    Follow.objects.filter(author__username=username,
-                          user=request.user).delete()
+    follow = get_object_or_404(
+        Follow, author__username=username, user=request.user
+    )
+    follow.delete()
     return redirect('profile', username=username)

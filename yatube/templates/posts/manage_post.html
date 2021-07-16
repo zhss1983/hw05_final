@@ -1,16 +1,20 @@
 {% extends "base.html" %}
-{% block title %}
-  {{ form.instance.id|yesno:"Редактировать,Добавить," }} запись
-{% endblock %}
-{% block content %}
-  <div class="row justify-content-center">
-    <div class="col-md-8 p-5">
-      <div class="card">
-        <div class="card-header">
-          {{ edit|yesno:"Редактировать,Добавить" }} запись
+{% load user_tags %}
+{% with card_hader=form.instance.id|yesno:"Редактировать,Добавить," %}
+  {% block title %}
+    {{ card_hader }} запись
+  {% endblock %}
+  {% block content %}
+    <div class="row justify-content-center">
+      <div class="col-md-8 p-5">
+        <div class="card">
+          <div class="card-header">
+            {{ card_hader }} запись
+          </div>
+          {% new_variable form.instance.id|yesno:"Сохранить,Добавить" as btn_name %}
+          {% include "includes/form.html" %}
         </div>
-        {% include "includes/form.html" with btn_name=edit|yesno:"Сохранить,Добавить" %}
       </div>
     </div>
-  </div>
-{% endblock %}
+  {% endblock %}
+{% endwith %}

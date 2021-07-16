@@ -27,7 +27,7 @@ class CommentAdmin(admin.ModelAdmin):
 
 class FollowAdmin(admin.ModelAdmin):
     list_display = ('pk', 'user', 'author')
-    search_fields = ('user', 'author')
+    search_fields = ('user__username', 'author__username')
 
 
 admin.site.register(Group, GroupAdmin)

@@ -1,15 +1,15 @@
-from http import HTTPStatus
+from datetime import datetime as dt
 from os import path
-import shutil
+from shutil import rmtree
+from tempfile import mkdtemp
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Comment, Follow, Group, Post
+from posts.models import Comment, Group, Post
 
 User = get_user_model()
 
@@ -19,71 +19,23 @@ class PostsTestsCase(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        settings.MEDIA_ROOT = 'tempfile_media'
-        cls.user = User.objects.create(username='user_PostsTestsCase')
-        cls.user_follow = User.objects.create(
-            username='user_follow',
-        )
+        settings.MEDIA_ROOT = mkdtemp(dir=settings.BASE_DIR)
+        cls.user = User.objects.create(username=f'user_{cls.__name__}')
         cls.group = Group.objects.create(
-            title='Group Тест_PostsTestsCase',
-            slug='test_PostsTestsCase',
-            description='Текст_PostsTestsCase',
+            title=f'Group Тест_{cls.__name__}',
+            slug=f'test_{cls.__name__}',
+            description=f'Текст_{cls.__name__}',
         )
-        img = cls.img_upload()
-        cls.post = Post.objects.create(
-            text='test_forms.py Тест_PostsTestsCase',
-            author=cls.user,
-            group=cls.group,
-            image=img
-        )
-        img.close()
         cls.url_new_post = reverse('new_post')
         cls.url_index = reverse('index')
-        cls.url_post_edit = reverse(
-            'post_edit',
-            kwargs={
-                'username': cls.user.username,
-                'post_id': cls.post.pk
-            }
-        )
-        cls.url_post = reverse(
-            'post',
-            kwargs={
-                'username': cls.user.username,
-                'post_id': cls.post.pk
-            }
-        )
-        cls.url_profile_follow = reverse(
-            'profile_follow',
-            kwargs={'username': cls.user_follow.username}
-        )
-        cls.url_profile_unfollow = reverse(
-            'profile_unfollow',
-            kwargs={'username': cls.user_follow.username}
-        )
-        cls.url_follow_index = reverse('follow_index')
-        cls.url_add_comment = reverse(
-            'add_comment',
-            kwargs={
-                'username': cls.user.username,
-                'post_id': cls.post.pk
-            }
-        )
-        cls.url_post_delete = reverse(
-            'post_delete',
-            kwargs={
-                'username': cls.user.username,
-                'post_id': cls.post.pk
-            }
-        )
+        cls.url_login = reverse('login')
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        rmtree(settings.MEDIA_ROOT, ignore_errors=True)
         super().tearDownClass()
 
-    @classmethod
-    def img_upload(cls):
+    def img_upload(self):
         return SimpleUploadedFile(
             name='small.gif',
             content=(
@@ -97,27 +49,62 @@ class PostsTestsCase(TestCase):
             content_type='image/gif'
         )
 
-    def test_auth_user_save_post_and_correct_redirect(self):
+    def setUp(self):
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.__class__.user)
+
+    def test_list_url_redirect_anonymous(self):
+        """Check redirect for an unauthorized user."""
+        cls = self.__class__
+        now = dt.now()
+        post = Post.objects.create(
+            text=f'Delete Post Тест_{cls.__name__} ({now})',
+            author=cls.user,
+            group=cls.group,
+        )
+        url_post_delete = reverse(
+            'post_delete',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': post.pk
+            }
+        )
+        url_post_edit = reverse(
+            'post_edit',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': post.pk
+            }
+        )
+        url_list = (
+            cls.url_new_post,
+            url_post_edit,
+            url_post_delete,
+        )
+        for url in url_list:
+            response = self.client.post(url)
+            with self.subTest(url=url):
+                self.assertRedirects(response, f'{cls.url_login}?next={url}')
+
+    def test_auth_user_add_post_and_correct_redirect(self):
         """Check save post and correct redirect."""
         cls = self.__class__
-        authorized_client = Client()
-        authorized_client.force_login(cls.user)
+        now = dt.now()
         context = {
             'group': cls.group.pk,
-            'text': ('Save new post (group = '
-                     f'{cls.group.pk}). {id(cls.group)}'),
-            'image': cls.img_upload()
+            'text': (f'Save new post {cls.__name__} ({now}).'),
+            'image': self.img_upload()
         }
         self.assertFalse(Post.objects.filter(text=context['text']).exists())
         count = Post.objects.count()
-        response = authorized_client.post(
+        response = self.authorized_client.post(
             cls.url_new_post,
             data=context
         )
-        self.assertTrue(Post.objects.filter(text=context['text']).exists())
         self.assertEqual(Post.objects.count(), count + 1)
-        post = Post.objects.first()
         self.assertRedirects(response, cls.url_index)
+        post = Post.objects.last()
+        self.assertEqual(post.text, context['text'])
         self.assertEqual(post.author, cls.user)
         self.assertEqual(post.group, cls.group)
         self.assertTrue(path.exists(post.image.path))
@@ -126,122 +113,136 @@ class PostsTestsCase(TestCase):
     def test_auth_user_edit_post_and_correct_redirect(self):
         """Check edit post and correct redirect."""
         cls = self.__class__
-        authorized_client = Client()
-        authorized_client.force_login(cls.user)
-        context = {
-            'group': cls.group.pk,
-            'text': ('Edit post (group = '
-                     f'{cls.group.pk}).  {id(cls.group)}'),
-            'image': cls.img_upload()
-        }
-        count = Post.objects.count()
-        cur_img = cls.post.image
-        response = authorized_client.post(
-            cls.url_post_edit,
-            data=context
+        now = dt.now()
+        post = Post.objects.create(
+            text=f'test_forms.py Тест_{cls.__name__} ({now})',
+            author=cls.user,
+            group=cls.group,
         )
-        post = Post.objects.first()
+        group2 = Group.objects.create(
+            title=f'Group Тест_{cls.__name__} №2',
+            slug=f'test_{cls.__name__}_n2',
+            description=f'Текст_{cls.__name__} №2',
+        )
+        context = {
+            'group': group2.pk,
+            'text': (f'Edit post ({now}).'),
+        }
+        url_post_edit = reverse(
+            'post_edit',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': post.pk
+            }
+        )
+        url_post = reverse(
+            'post',
+            kwargs={
+                'username': cls.user.username,
+                'post_id': post.pk
+            }
+        )
+        count = Post.objects.count()
+        response = self.authorized_client.post(url_post_edit, data=context)
+        post.refresh_from_db()
         self.assertEqual(Post.objects.count(), count)
-        self.assertRedirects(response, cls.url_post)
+        self.assertRedirects(response, url_post)
         self.assertEqual(post.author, cls.user)
-        self.assertEqual(post.group, cls.group)
-        self.assertTrue(post.image)
-        self.assertNotEqual(post.image, cur_img)
-        self.assertTrue(path.exists(post.image.path))
-        context['image'].close()
+        self.assertEqual(post.group, group2)
+        self.assertEqual(post.text, context['text'])
 
     def test_auth_wrong_user_edit_post_and_correct_redirect(self):
         """Check wrong user could'nt edit post and correct redirect."""
         cls = self.__class__
+        now = dt.now()
         wrong_user = User.objects.create(
             username='wrong_user',
         )
-        wrong_client = Client()
-        wrong_client.force_login(wrong_user)
-        context = {
-            'group': cls.group.pk,
-            'text': ('Edit post (group = '
-                     f'{cls.group.pk}).  {id(cls.group)}'),
-            'image': cls.img_upload()
-        }
-        cur_img = cls.post.image
-        response = wrong_client.post(
-            cls.url_post_edit,
-            data=context
+        post = Post.objects.create(
+            text=f'test_forms.py Тест_{cls.__name__}',
+            author=wrong_user,
+            group=cls.group,
         )
-        post = Post.objects.get(pk=cls.post.pk)
-        self.assertRedirects(response, cls.url_post)
-        self.assertNotEqual(post.text, context['text'])
-        self.assertNotEqual(post.author, wrong_user)
-        self.assertTrue(post.image)
-        self.assertEqual(post.image, cur_img)
-        self.assertNotEqual(post.image, context['image'])
-        context['image'].close()
-
-    def test_not_auth_user_edit_post(self):
-        """Check wrong user could'nt edit post and correct redirect."""
-        cls = self.__class__
+        group3 = Group.objects.create(
+            title=f'Group Тест_{cls.__name__} №3',
+            slug=f'test_{cls.__name__}_n3',
+            description=f'Текст_{cls.__name__} №3',
+        )
         context = {
-            'group': cls.group.pk,
-            'text': ('Edit post (group = '
-                     f'{cls.group.pk}).  {id(cls.group)}'),
-            'image': cls.img_upload()
+            'group': group3.pk,
+            'text': (f'Edit post {cls.__name__} ({now}).'),
         }
-        cur_img = cls.post.image
+        url_post_edit = reverse(
+            'post_edit',
+            kwargs={
+                'username': wrong_user.username,
+                'post_id': post.pk
+            }
+        )
+        url_post = reverse(
+            'post',
+            kwargs={
+                'username': wrong_user.username,
+                'post_id': post.pk
+            }
+        )
         count = Post.objects.count()
-        self.client.post(
-            cls.url_post_edit,
+        response = self.authorized_client.post(
+            url_post_edit,
             data=context
         )
-        post = Post.objects.get(pk=cls.post.pk)
-        self.assertEqual(Post.objects.count(), count)
+        self.assertEqual(count, Post.objects.count())
+        post.refresh_from_db()
+        self.assertRedirects(response, url_post)
         self.assertNotEqual(post.text, context['text'])
-        self.assertNotEqual(post.author, AnonymousUser)
-        self.assertTrue(post.image)
-        self.assertEqual(post.image, cur_img)
-        context['image'].close()
+        self.assertEqual(post.author, wrong_user)
+        self.assertEqual(post.group, cls.group)
+
+    def test_not_auth_user_add_post(self):
+        """Check wrong user could'nt add post and correct redirect."""
+        cls = self.__class__
+        now = dt.now()
+        group4 = Group.objects.create(
+            title=f'Group Тест_{cls.__name__} №4',
+            slug=f'test_{cls.__name__}_n4',
+            description=f'Текст_{cls.__name__} №4',
+        )
+        context = {
+            'group': group4.pk,
+            'text': (f'Save new post {cls.__name__} by wrong user ({now}).'),
+        }
+        count = Post.objects.count()
+        response = self.client.post(
+            cls.url_new_post,
+            data=context
+        )
+        self.assertEqual(Post.objects.count(), count)
+        self.assertRedirects(
+            response,
+            f'{cls.url_login}?next={cls.url_new_post}'
+        )
 
     def test_delete_url_redirect_post(self):
         """Check redirect for an authorized user."""
         cls = self.__class__
+        now = dt.now()
+        post = Post.objects.create(
+            text=f'Delete Post {cls.__name__} ({now})',
+            author=cls.user,
+            group=cls.group,
+        )
         url_post_delete = reverse(
             'post_delete',
             kwargs={
                 'username': cls.user.username,
-                'post_id': cls.post.pk
+                'post_id': post.pk
             }
         )
-        this_url = '/some_strange_DELETE_URL/'
-        authorized_client = Client()
-        authorized_client.force_login(cls.user)
-        response = authorized_client.post(url_post_delete,
-                                          {'this_url': this_url})
-        """
-        Не применяю assertRedirects т.к. далее происходит переброска на
-        страницу поиска профиля пользователя и после - 404. Мне необходимо
-        проверить что редирект будет произведён именно по адресу из контекста
-        хранящемуся в this_url
-        """
-        self.assertEqual(response.url, this_url)
-        self.assertEqual(response.status_code, HTTPStatus.FOUND)
-
-    def test_list_url_redirect_anonymous(self):
-        """Check redirect for an unauthorized user."""
-        cls = self.__class__
-        url_login = reverse('login')
-        url_list = (
-            cls.url_new_post,
-            cls.url_post_edit,
-            cls.url_add_comment,
-            cls.url_post_delete,
-            cls.url_follow_index,
-            cls.url_profile_follow,
-            cls.url_profile_unfollow,
+        response = self.authorized_client.post(
+            url_post_delete,
+            {'this_url': cls.url_index}
         )
-        for url in url_list:
-            response = self.client.post(url)
-            with self.subTest(url=url):
-                self.assertRedirects(response, f'{url_login}?next={url}')
+        self.assertRedirects(response, cls.url_index)
 
 
 class CommentsTestCase(TestCase):
@@ -249,14 +250,14 @@ class CommentsTestCase(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user = User.objects.create(username='user_CommentsTestCase')
+        cls.user = User.objects.create(username=f'user_{cls.__name__}')
         cls.group = Group.objects.create(
-            title='Тест_CommentsTestCase',
-            slug='test_CommentsTestCase',
-            description='Текст_CommentsTestCase',
+            title=f'Тест_{cls.__name__}',
+            slug=f'test_{cls.__name__}',
+            description=f'Текст_{cls.__name__}',
         )
         cls.post = Post.objects.create(
-            text='Тест CommentsTestCase',
+            text=f'Тест {cls.__name__}',
             author=cls.user,
             group=cls.group,
         )
@@ -274,110 +275,39 @@ class CommentsTestCase(TestCase):
                 'post_id': cls.post.pk
             }
         )
+        cls.url_login = reverse('login')
+
+    def setUp(self):
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.__class__.user)
 
     def test_auth_user_add_comment(self):
         """Checking the addition of a comment."""
         cls = self.__class__
+        now = dt.now()
         context = {
-            'text': f'Текст комментария для posta {cls.post.pk} {id(cls.post)}'
+            'text': f'Текст комментария для posta {cls.__name__} ({now})'
         }
         count = Comment.objects.count()
-        authorized_client = Client()
-        authorized_client.force_login(cls.user)
-        resp = authorized_client.post(cls.url_add_comment, data=context)
+        resp = self.authorized_client.post(cls.url_add_comment, data=context)
         self.assertRedirects(resp, cls.url_post)
         self.assertEqual(count + 1, Comment.objects.count())
-        comment = Comment.objects.first()
+        comment = Comment.objects.last()
         self.assertEqual(comment.text, context['text'])
-        response = self.client.get(cls.url_post)
-        comments = response.context['post'].comments.all()
-        self.assertIn(comment, comments)
+        self.assertEqual(comment.author, cls.user)
+        self.assertEqual(comment.post, cls.post)
 
     def test_not_auth_user_add_comment(self):
         """Checking the addition of a comment from not authorise user."""
         cls = self.__class__
+        now = dt.now()
         context = {
-            'text': f'Текст комментария для posta {cls.post.pk} {id(cls.post)}'
+            'text': f'Текст комментария для posta {cls.__name__} ({now}).'
         }
         count = Comment.objects.count()
-        self.client.post(cls.url_add_comment, data=context)
+        response = self.client.post(cls.url_add_comment, data=context)
         self.assertEqual(count, Comment.objects.count())
-        comment = Comment.objects.first()
-        self.assertFalse(comment,
-                         Comment.objects.filter(text=context['text']).exists())
-        if comment is not None:
-            self.assertNotEqual(comment.text, context['text'])
-        response = self.client.get(cls.url_post)
-        comments = response.context['post'].comments.all()
-        self.assertNotIn(comment, comments)
-
-
-class FollowTestCase(TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = User.objects.create(username='user_FollowTestCase')
-        cls.user_follow = User.objects.create(
-            username='user_follow_FollowTestCase'
+        self.assertRedirects(
+            response,
+            f'{cls.url_login}?next={cls.url_add_comment}'
         )
-        cls.post_follow = Post.objects.create(
-            text=f'test_follow. {id(cls.user_follow)}',
-            author=cls.user_follow,
-        )
-        cls.post = Post.objects.create(
-            text=f'test_follow. {id(cls.user)}',
-            author=cls.user,
-        )
-        cls.url_profile_follow = reverse(
-            'profile_follow',
-            kwargs={'username': cls.user_follow.username}
-        )
-        cls.url_profile_unfollow = reverse(
-            'profile_unfollow',
-            kwargs={'username': cls.user.username}
-        )
-        cls.url_follow_index = reverse('follow_index')
-
-    def test_auth_user_follow(self):
-        """Check subscribe function."""
-        cls = self.__class__
-        authorized_client = Client()
-        authorized_client.force_login(cls.user)
-        following_profile = reverse(
-            'profile',
-            kwargs={'username': cls.user_follow.username}
-        )
-        # Подписываюсь
-        count = Follow.objects.count() + 1
-        response = authorized_client.post(cls.url_profile_follow)
-        self.assertRedirects(response, following_profile)
-        # Проверяю подписка
-        follow = Follow.objects.first()
-        self.assertEqual(follow.user, cls.user)
-        self.assertEqual(follow.author, cls.user_follow)
-        self.assertEqual(count, Follow.objects.count())
-        # Проверяю что результат подписки выводится на странице
-        response = authorized_client.post(cls.url_follow_index)
-        self.assertIn(cls.post_follow, response.context['page'])
-
-    def test_auth_user_unfollow(self):
-        """Check unsubscribe function."""
-        cls = self.__class__
-        authorized_client = Client()
-        authorized_client.force_login(cls.user_follow)
-        follow = Follow.objects.create(author=cls.user, user=cls.user_follow)
-        following_profile = reverse(
-            'profile',
-            kwargs={'username': cls.user.username}
-        )
-        count = Follow.objects.count() - 1
-        # Отписываюсь
-        response = authorized_client.post(cls.url_profile_unfollow)
-        self.assertRedirects(response, following_profile)
-        # Проверяю удаление подписки
-        self.assertFalse(Follow.objects.filter(pk=follow.pk).exists())
-        self.assertEqual(count, Follow.objects.count())
-        # Проверка что более указанного поста нет в выводе
-        response = authorized_client.post(cls.url_follow_index)
-        self.assertNotIn(cls.post_follow, response.context['page'])

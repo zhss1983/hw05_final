@@ -10,7 +10,7 @@
           <div class="card-header">
             {{ card_hader }} запись
           </div>
-          {% with btn_name=edit|yesno:"Сохранить,Добавить" %}
+          {% with btn_name=form.instance.id|yesno:"Сохранить,Добавить" %}
             {% include "includes/form.html" %}
           {% endwith %}
         </div>

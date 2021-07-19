@@ -1,16 +1,14 @@
 from http import HTTPStatus
 
-from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.test import Client
 from django.urls import reverse
 
-from posts.models import Follow, Group, Post
+from posts.models import Group, Post, User
+from .test_basetestcase import BaseTestCase
 
-User = get_user_model()
 
-
-class PostURLTestsCase(TestCase):
+class PostURLTestsCase(BaseTestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -26,8 +24,6 @@ class PostURLTestsCase(TestCase):
             author=cls.user,
             group=cls.group,
         )
-        cls.url_index = reverse('index')
-        cls.url_new_post = reverse('new_post')
         cls.url_group = reverse('group', kwargs={'slug': cls.group.slug})
         cls.url_profile = reverse(
             'profile',
@@ -148,28 +144,28 @@ class PostURLTestsCase(TestCase):
         self.assertRedirects(response, url_post)
 
 
-class CommentURLTestCase(TestCase):
+class CommentURLTestCase(BaseTestCase):
 
     def test_absolute_path_by_name(self):
         """Check absolute url paths."""
+        user, post = 'user', 1
         url_add_comment = reverse(
             'add_comment',
             kwargs={
-                'username': 'user',
-                'post_id': 1
+                'username': user,
+                'post_id': post
             }
         )
-        self.assertEqual(url_add_comment, '/user/1/comment/')
+        self.assertEqual(url_add_comment, f'/{user}/{post}/comment/')
 
 
-class FollowURLTestCase(TestCase):
+class FollowURLTestCase(BaseTestCase):
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.user = User.objects.create(username='user_FollowTestCase')
         cls.user_follow = User.objects.create(username='user_follow_test')
-        cls.url_follow_index = reverse('follow_index')
         cls.url_following_profile = reverse(
             'profile',
             kwargs={'username': cls.user_follow.username}
@@ -190,14 +186,13 @@ class FollowURLTestCase(TestCase):
     def test_auth_user_follow_redirect(self):
         """Check subscribe function."""
         cls = self.__class__
-        response = self.authorized_client.post(cls.url_profile_follow)
+        response = self.authorized_client.get(cls.url_profile_follow)
         self.assertRedirects(response, cls.url_following_profile)
 
     def test_auth_user_unfollow_redirect(self):
         """Check unsubscribe function."""
         cls = self.__class__
-        Follow.objects.create(author=cls.user_follow, user=cls.user)
-        response = self.authorized_client.post(cls.url_profile_unfollow)
+        response = self.authorized_client.get(cls.url_profile_unfollow)
         self.assertRedirects(response, cls.url_following_profile)
 
     def test_list_url_redirect_anonymous(self):
@@ -214,7 +209,7 @@ class FollowURLTestCase(TestCase):
             with self.subTest(url=url):
                 self.assertRedirects(response, f'{url_login}?next={url}')
 
-    def test_auth_url_exists_at_desired_location(self):
+    def test_for_auth_user_exists_url_at_desired_location(self):
         """Check addres available."""
         cls = self.__class__
         response = self.authorized_client.get(cls.url_follow_index)

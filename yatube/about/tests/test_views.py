@@ -13,5 +13,4 @@ class TemplateTestCase(TestCase):
         for url, template_name in url_list:
             with self.subTest(url=url):
                 response = self.client.get(reverse(url))
-                self.assertTemplateUsed(response,
-                                        template_name=template_name)
+                self.assertTemplateUsed(response, template_name=template_name)

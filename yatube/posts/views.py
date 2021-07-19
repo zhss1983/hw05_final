@@ -202,8 +202,6 @@ def profile_follow(request, username):
 @login_required
 def profile_unfollow(request, username):
     """Unsubscribe the user from the author."""
-    follow = get_object_or_404(
-        Follow, author__username=username, user=request.user
-    )
-    follow.delete()
+    author = get_object_or_404(User, username=username)
+    Follow.objects.filter(author=author, user=request.user).delete()
     return redirect('profile', username=username)

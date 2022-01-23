@@ -4,8 +4,8 @@ from django.conf import settings
 from django.test import Client, override_settings
 from django.urls import reverse
 
-from posts.models import Comment, Group, Post, User
-from .test_basetestcase import BaseTestCase
+from ..models import Comment, Group, Post, User
+from .basetestcase import BaseTestCase
 
 
 @override_settings(MEDIA_ROOT=mkdtemp(dir=settings.BASE_DIR))

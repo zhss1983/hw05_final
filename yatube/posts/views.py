@@ -6,17 +6,18 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.vary import vary_on_cookie
+from django.conf import settings
 
 from .forms import CommentForm, PostForm
 from .models import Comment, Follow, Group, Post, User
-from yatube.settings import CACHE_TTL, DELTA_PAGE_COUNT, MAX_PAGE_COUNT
+
 
 
 def my_paginator(
         page_list,
         page_number,
-        dcount=DELTA_PAGE_COUNT,
-        count=MAX_PAGE_COUNT,
+        dcount=settings.DELTA_PAGE_COUNT,
+        count=settings.MAX_PAGE_COUNT,
 ):
     """Return dictionary of variables for the paginator.
 
@@ -35,10 +36,10 @@ def my_paginator(
     }
 
 
-@cache_page(CACHE_TTL, key_prefix='index_page')
+@cache_page(settings.CACHE_TTL, key_prefix='index_page')
 @vary_on_cookie
 def index(request):
-    """Return page with MAX_PAGE_COUNT posts."""
+    """Return page with settings.MAX_PAGE_COUNT posts."""
     post_list = Post.objects.select_related(
         'author',
         'group',
@@ -53,7 +54,7 @@ def index(request):
 
 
 def group_posts(request, slug):
-    """Return the MAX_PAGE_COUNT posts in the selected group."""
+    """Return the settings.MAX_PAGE_COUNT posts in the selected group."""
     group = get_object_or_404(Group, slug=slug)
     post_list = group.posts.select_related('author').prefetch_related(
         'comments')
@@ -114,8 +115,8 @@ def new_post(request):
     about it and can try to enter them again.
     """
     form = PostForm(
-        request.POST or None,
-        files=request.FILES or None,
+        request.POST,
+        files=request.FILES,
         instance=Post(author=request.user)
     )
     if form.is_valid():
@@ -140,8 +141,8 @@ def post_edit(request, username, post_id):
     if post.author != request.user:
         return redirect('post', username=username, post_id=post_id)
     form = PostForm(
-        request.POST or None,
-        files=request.FILES or None,
+        request.POST,
+        files=request.FILES,
         instance=post
     )
     if form.is_valid():

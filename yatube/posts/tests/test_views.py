@@ -5,11 +5,10 @@ from django.core.cache import cache
 from django.test import Client, override_settings
 from django.urls import reverse
 
-from posts.forms import PostForm
-from posts.models import Follow, Group, Post, User
-from posts.views import my_paginator
-from yatube.settings import DELTA_PAGE_COUNT, MAX_PAGE_COUNT
-from .test_basetestcase import BaseTestCase
+from ..forms import PostForm
+from ..models import Follow, Group, Post, User
+from ..views import my_paginator
+from .basetestcase import BaseTestCase
 
 
 class PostsTestsCase(BaseTestCase):
@@ -235,18 +234,18 @@ class PaginatorViewsTestCase(BaseTestCase):
             slug=f'test_{cls.__name__}',
             description=f'Текст_{cls.__name__}',
         )
-        """MAX_PAGE_COUNT - Число постов на странице. (по умолчанию 10)
-        DELTA_PAGE_COUNT - Число страниц отображаемых в пагинаторе относительно
-        текущей. (DELTA_PAGE_COUNT = 1 if DEBUG else 10)
+        """settings.MAX_PAGE_COUNT - Число постов на странице. (по умолчанию 10)
+        settings.DELTA_PAGE_COUNT - Число страниц отображаемых в пагинаторе относительно
+        текущей. (settings.DELTA_PAGE_COUNT = 1 if DEBUG else 10)
         """
         cls.less_ten = 3  # количество постов на последней странице
         # Вычисляю количество полных страниц.
-        cls.page_count = DELTA_PAGE_COUNT * 2 + 3
+        cls.page_count = settings.DELTA_PAGE_COUNT * 2 + 3
         # Создаю необходимое количество постов,
         cls.posts = tuple(
             Post.objects.create(text=f'Тест {count}', author=cls.user,
                                 group=cls.group) for count in
-            range(cls.page_count * MAX_PAGE_COUNT + cls.less_ten)
+            range(cls.page_count * settings.MAX_PAGE_COUNT + cls.less_ten)
         )
         cls.url_group = reverse('group', kwargs={'slug': cls.group.slug})
         cls.url_profile = reverse(
@@ -267,44 +266,44 @@ class PaginatorViewsTestCase(BaseTestCase):
             (  # Предыдущая, _1_, 2, ..., 6, Следующая
                 1,
                 2,
-                min(pages - 1, DELTA_PAGE_COUNT + 1),
-                MAX_PAGE_COUNT
+                min(pages - 1, settings.DELTA_PAGE_COUNT + 1),
+                settings.MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, _2_, 3, ..., 6, Следующая
                 2,
-                max(2, 2 - DELTA_PAGE_COUNT),
-                min(pages - 1, 2 + DELTA_PAGE_COUNT),
-                MAX_PAGE_COUNT
+                max(2, 2 - settings.DELTA_PAGE_COUNT),
+                min(pages - 1, 2 + settings.DELTA_PAGE_COUNT),
+                settings.MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, 2, _3_, 4, ..., 6, Следующая
-                2 + DELTA_PAGE_COUNT,
+                2 + settings.DELTA_PAGE_COUNT,
                 2,
-                min(pages - 1, 2 + 2 * DELTA_PAGE_COUNT),
-                MAX_PAGE_COUNT
+                min(pages - 1, 2 + 2 * settings.DELTA_PAGE_COUNT),
+                settings.MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, ..., 5, _6_, Следующая
                 pages,
-                max(2, pages - DELTA_PAGE_COUNT),
+                max(2, pages - settings.DELTA_PAGE_COUNT),
                 pages - 1,
                 self.less_ten  # На странице только 3 поста вместо 10
             ),
             (  # Предыдущая, 1, ..., 4, _5_, 6, Следующая
                 pages - 1,
-                max(2, pages - 1 - DELTA_PAGE_COUNT),
-                min(pages - 1, pages - 1 + DELTA_PAGE_COUNT),
-                MAX_PAGE_COUNT
+                max(2, pages - 1 - settings.DELTA_PAGE_COUNT),
+                min(pages - 1, pages - 1 + settings.DELTA_PAGE_COUNT),
+                settings.MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, ..., 3, _4_, 5, 6, Следующая
-                pages - 2 - DELTA_PAGE_COUNT,
-                max(2, pages - 2 - 2 * DELTA_PAGE_COUNT),
+                pages - 2 - settings.DELTA_PAGE_COUNT,
+                max(2, pages - 2 - 2 * settings.DELTA_PAGE_COUNT),
                 pages - 2,
-                MAX_PAGE_COUNT
+                settings.MAX_PAGE_COUNT
             ),
             (  # Предыдущая, 1, 2, _3_, 4, ..., 6, Следующая
                 pages // 2,
-                max(2, pages // 2 - DELTA_PAGE_COUNT),
-                min(pages - 1, pages // 2 + DELTA_PAGE_COUNT),
-                MAX_PAGE_COUNT
+                max(2, pages // 2 - settings.DELTA_PAGE_COUNT),
+                min(pages - 1, pages // 2 + settings.DELTA_PAGE_COUNT),
+                settings.MAX_PAGE_COUNT
             ),
         )
         """Я тестирую свою функцию пагинатора на то что при любом поступающем

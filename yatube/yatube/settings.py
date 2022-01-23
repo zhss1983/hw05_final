@@ -5,12 +5,15 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '@7wb^@135m+&okzndlvb1q$wzo1c1k16sxeq%d(30+e6(qk^xf'
 
 DEBUG = True
+#DEBUG = False
 
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '[::1]',
     'testserver',
+    'www.zhss1983.pythonanywhere.com',
+    'zhss1983.pythonanywhere.com',
 ]
 
 INTERNAL_IPS = [

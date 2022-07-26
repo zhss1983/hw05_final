@@ -121,7 +121,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+yatube/.env
 .venv
 env/
 venv/

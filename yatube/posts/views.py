@@ -12,7 +12,6 @@ from .forms import CommentForm, PostForm
 from .models import Comment, Follow, Group, Post, User
 
 
-
 def my_paginator(
         page_list,
         page_number,

@@ -1,20 +1,16 @@
-import os
+from os import getenv
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from dotenv import load_dotenv
+from pathlib import Path
 
-SECRET_KEY = '@7wb^@135m+&okzndlvb1q$wzo1c1k16sxeq%d(30+e6(qk^xf'
+DEBUG = True  # DEBUG = False
 
-DEBUG = True
-#DEBUG = False
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    '[::1]',
-    'testserver',
-    'www.zhss1983.pythonanywhere.com',
-    'zhss1983.pythonanywhere.com',
-]
+load_dotenv(BASE_DIR / '.env')
+
+SECRET_KEY = getenv('SECRET_KEY')
+ALLOWED_HOSTS = (*map(lambda host: host.strip(' ,\t\n\r'), getenv('ALLOWED_HOSTS').split(',')),)
 
 INTERNAL_IPS = [
     '127.0.0.1',
@@ -48,7 +44,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'yatube.urls'
 
-TEMPLATES_DIR = os.path.join(BASE_DIR, 'templates')
+TEMPLATES_DIR = BASE_DIR / 'templates'
 
 TEMPLATES = [
     {
@@ -72,7 +68,7 @@ WSGI_APPLICATION = 'yatube.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -102,19 +98,19 @@ USE_L10N = True
 USE_TZ = True
 
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'about/img'),
+    BASE_DIR / 'about' /' img',
 ]
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_ROOT = BASE_DIR / 'static'
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / 'media'
 
 LOGIN_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = 'index'
 
 EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
-EMAIL_FILE_PATH = os.path.join(BASE_DIR, 'sent_emails')
+EMAIL_FILE_PATH = BASE_DIR / 'sent_emails'
 
 MAX_PAGE_COUNT = 10
 DELTA_PAGE_COUNT = 1 if DEBUG else 5

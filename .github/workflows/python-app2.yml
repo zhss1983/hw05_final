@@ -42,4 +42,4 @@ jobs:
         DEBUG: 1
         ALLOWED_HOSTS: "*"
       run: |
-        py.test
+        python yatube/manage.py test

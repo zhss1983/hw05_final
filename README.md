@@ -1,3 +1,6 @@
+
+![example workflow](https://github.com/zhss1983/hw05_final/actions/workflows/python-app.yml/badge.svg)
+
 # Документация к YaTube
 
 ## Описание:

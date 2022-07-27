@@ -10,7 +10,27 @@ YaTube - сервис публикации своего дневника. Ест
 
 ### Стек технологий:
 
-Python 3, Django 3, MySQL, Unittest, HTML, CSS.
+**[Python 3](https://www.python.org/downloads/), 
+[Django 3/4](https://docs.djangoproject.com/en/4.0/), 
+ [MySQL](https://dev.mysql.com/doc/), 
+ [Unittest](https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/unit-tests/), 
+ [DjangoTemplates](https://docs.djangoproject.com/en/4.0/topics/templates/), 
+ HTML, 
+ CSS.**
+
+## Как работает:
+
+Авторизация в проекте происходит за счёт стандартного модуля django.contrib.auth. Единственное изменение - я заменил
+ стандартный шаблон на собственный, в едином стиле с приложением.
+
+В проекте применяются шаблоны на базе [```DjangoTemplates```](https://docs.djangoproject.com/en/4.0/topics/templates/).
+ Все страницы оформлены в едином стиле с применением
+ [Bootstrap v4.3.1](https://getbootstrap.com/docs/4.3/getting-started/introduction/). Для наиболее комфортного вывода
+ данных на страницу применён пагинатор, в шаблоне прописан специальный скрипт позволяющий выводить количество страниц
+ доступных к просмотру. Причём лишние страницы скрываются.
+ Вывод будет примерно таким: ```« Предыдущая 1 ... 4 5 6 ... 10 Следующая »```
+
+Проект покрыт тестами. Результаты выводимые на главной странице закэшированы. 
 
 ## Как запустить проект:
 

@@ -3,14 +3,13 @@ from os import getenv
 from dotenv import load_dotenv
 from pathlib import Path
 
-DEBUG = True  # DEBUG = False
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / '.env')
 
+DEBUG = getenv('DEBUG') == 'True'
 SECRET_KEY = getenv('SECRET_KEY')
-ALLOWED_HOSTS = (*map(lambda host: host.strip(' ,\t\n\r'), getenv('ALLOWED_HOSTS').split(',')),)
+ALLOWED_HOSTS = [*map(lambda host: host.strip(' ,\t\n\r'), getenv('ALLOWED_HOSTS').split(','))]
 
 INTERNAL_IPS = [
     '127.0.0.1',
@@ -73,18 +72,10 @@ DATABASES = {
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 LANGUAGE_CODE = 'ru'
@@ -98,7 +89,7 @@ USE_L10N = True
 USE_TZ = True
 
 STATICFILES_DIRS = [
-    BASE_DIR / 'about' /' img',
+    BASE_DIR / 'about' / 'img',
 ]
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'

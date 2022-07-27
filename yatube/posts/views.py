@@ -1,7 +1,6 @@
 from http import HTTPStatus
 
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_http_methods, require_POST
@@ -10,29 +9,7 @@ from django.conf import settings
 
 from .forms import CommentForm, PostForm
 from .models import Comment, Follow, Group, Post, User
-
-
-def my_paginator(
-        page_list,
-        page_number,
-        dcount=settings.DELTA_PAGE_COUNT,
-        count=settings.MAX_PAGE_COUNT,
-):
-    """Return dictionary of variables for the paginator.
-
-    It is necessary to display the first, last page, the current one and
-    'dcount' pages before and after current one.
-    'count' is a maximum posts per page.
-    """
-    paginator = Paginator(page_list, count)
-    page = paginator.get_page(page_number)
-    from_page = max(page.number - dcount, 2)
-    to_page = min(page.number + dcount, paginator.num_pages - 1)
-    return {
-        'from_page': from_page,
-        'to_page': to_page,
-        'page': page,
-    }
+from .paginator import my_paginator
 
 
 @cache_page(settings.CACHE_TTL, key_prefix='index_page')
@@ -53,7 +30,7 @@ def index(request):
 
 
 def group_posts(request, slug):
-    """Return the settings.MAX_PAGE_COUNT posts in the selected group."""
+    """Return several (settings.MAX_PAGE_COUNT) posts in the selected group."""
     group = get_object_or_404(Group, slug=slug)
     post_list = group.posts.select_related('author').prefetch_related(
         'comments')

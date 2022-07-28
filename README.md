@@ -16,7 +16,7 @@ YaTube - сервис публикации своего дневника. Ест
 ### Стек технологий:
 
 **[Python 3](https://www.python.org/downloads/), 
-[Django 3/4](https://docs.djangoproject.com/en/4.0/), 
+ [Django 3/4](https://docs.djangoproject.com/en/4.0/), 
  [MySQL](https://dev.mysql.com/doc/), 
  [Unittest](https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/unit-tests/), 
  [DjangoTemplates](https://docs.djangoproject.com/en/4.0/topics/templates/), 
